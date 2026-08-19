@@ -36,6 +36,7 @@ export 'src/types/errors.dart';
 export 'src/types/pdf_config.dart';
 export 'src/types/pdf_enums.dart';
 export 'src/types/pdf_image.dart';
+export 'src/types/pdf_image_optimization_options.dart';
 export 'src/types/pdf_page_info.dart';
 export 'src/types/pdf_pages.dart';
 export 'src/types/pdf_params.dart';

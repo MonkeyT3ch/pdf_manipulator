@@ -1,6 +1,6 @@
 {
   "crate": "pdf_oxide",
-  "repo": "whuppi/pdf_manipulator",
+  "repo": "MonkeyT3ch/pdf_manipulator",
   "baseTag": "v0.3.73",
   "features": {
     "native": "icc,legacy-crypto,rendering,signatures,native-bridge,cjk-form-fonts",

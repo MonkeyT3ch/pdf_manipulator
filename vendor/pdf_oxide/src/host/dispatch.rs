@@ -610,15 +610,18 @@ pub fn edit_compress(editor: &mut DocumentEditor, _quality: u8) -> Result<()> {
     Ok(())
 }
 
-/// Recompress images above `min_size` bytes at the given quality. Returns count optimized.
-pub fn edit_optimize_images(editor: &mut DocumentEditor, quality: u8, min_size: u32) -> Result<usize> {
+/// Placement-aware image optimization. Returns the number of replaced images.
+pub fn edit_optimize_images(
+    editor: &mut DocumentEditor,
+    options: crate::host::image_optimizer::ImageOptimizationOptions,
+) -> Result<usize> {
     // Image optimizer runs on the source document's object graph.
     // Modified objects are staged via insert_modified for the next save.
     #[cfg(feature = "rendering")]
     {
         let mut mods = std::collections::HashMap::new();
         let count = crate::host::image_optimizer::optimize_images(
-            editor.source(), &mut mods, quality, min_size,
+            editor.source(), &mut mods, &options,
         )?;
         for (id, obj) in mods {
             editor.insert_modified(id, obj);
@@ -627,7 +630,7 @@ pub fn edit_optimize_images(editor: &mut DocumentEditor, quality: u8, min_size: 
     }
     #[cfg(not(feature = "rendering"))]
     {
-        let _ = (editor, quality, min_size);
+        let _ = (editor, options);
         Ok(0)
     }
 }

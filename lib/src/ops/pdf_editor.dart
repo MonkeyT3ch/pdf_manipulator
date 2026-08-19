@@ -10,6 +10,7 @@ import 'package:pdf_manipulator/src/ops/pdf_doc.dart';
 import 'package:pdf_manipulator/src/types/data_sink.dart';
 import 'package:pdf_manipulator/src/types/data_source.dart';
 import 'package:pdf_manipulator/src/types/pdf_enums.dart';
+import 'package:pdf_manipulator/src/types/pdf_image_optimization_options.dart';
 import 'package:pdf_manipulator/src/types/pdf_task.dart';
 import 'package:pdf_manipulator/src/types/pdf_params.dart';
 import 'package:pdf_manipulator/src/bridge/pdf_bridge.dart';
@@ -187,6 +188,12 @@ class PdfEditor {
   PdfTask<int> optimizeImages({int quality = 75, int minSize = 128}) {
     _check();
     return _handle.optimizeImages(quality: quality, minSize: minSize);
+  }
+
+  /// Optimizes images using placement-aware resolution and encoding controls.
+  PdfTask<int> optimizeImagesWithOptions(PdfImageOptimizationOptions options) {
+    _check();
+    return _handle.optimizeImagesWithOptions(options);
   }
 
   /// Removes embedded copies of standard PDF fonts to reduce file size.

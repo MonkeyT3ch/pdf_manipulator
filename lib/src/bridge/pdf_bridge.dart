@@ -9,6 +9,7 @@ import 'package:pdf_manipulator/src/types/pdf_enums.dart';
 import 'package:pdf_manipulator/src/types/pdf_pages.dart';
 import 'package:pdf_manipulator/src/types/pdf_params.dart';
 import 'package:pdf_manipulator/src/types/pdf_image.dart';
+import 'package:pdf_manipulator/src/types/pdf_image_optimization_options.dart';
 import 'package:pdf_manipulator/src/types/pdf_rect.dart';
 import 'package:pdf_manipulator/src/types/pdf_signature.dart';
 import 'package:pdf_manipulator/src/types/pdf_task.dart';
@@ -199,6 +200,9 @@ abstract class BridgeEditorHandle {
 
   /// Recompresses images, returning the count of optimized images.
   PdfTask<int> optimizeImages({int quality = 75, int minSize = 128});
+
+  /// Optimizes images using placement-aware resolution and encoding controls.
+  PdfTask<int> optimizeImagesWithOptions(PdfImageOptimizationOptions options);
 
   /// Removes embedded standard fonts, returning count unembedded.
   PdfTask<int> unembedStandardFonts();

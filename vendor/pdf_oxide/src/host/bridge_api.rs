@@ -599,10 +599,33 @@ fn do_editor_mutate(
             ok_response()
         }
         "optimizeImages" => {
+            let legacy_min_size = req.get_i32("minSize").map(|value| value.max(0) as u32);
+            let options = crate::host::image_optimizer::ImageOptimizationOptions {
+                jpeg_quality: req.get_i32("quality").unwrap_or(75).clamp(1, 100) as u8,
+                target_dpi: req.get_f64("targetDpi").unwrap_or(0.0).max(0.0),
+                downsample_threshold: req
+                    .get_f64("downsampleThreshold")
+                    .unwrap_or(1.5)
+                    .max(1.0),
+                chroma_subsampling: match req.get_str("chromaSubsampling") {
+                    Some("444") => crate::host::image_optimizer::ChromaSubsampling::Yuv444,
+                    Some("420") => crate::host::image_optimizer::ChromaSubsampling::Yuv420,
+                    _ => crate::host::image_optimizer::ChromaSubsampling::Yuv422,
+                },
+                minimum_source_bytes: req
+                    .get_i32("minimumSourceBytes")
+                    .map(|value| value.max(0) as usize)
+                    .unwrap_or_else(|| legacy_min_size.unwrap_or(128) as usize),
+                minimum_saving_ratio: req
+                    .get_f64("minimumSavingRatio")
+                    .unwrap_or(0.0)
+                    .clamp(0.0, 0.99),
+                pass_through_jpeg: req.get_bool("passThroughJpeg").unwrap_or(true),
+                legacy_min_dimension: legacy_min_size.unwrap_or(0),
+            };
             let count = dispatch::edit_optimize_images(
                 editor,
-                req.get_i32("quality").unwrap_or(75) as u8,
-                req.get_i32("minSize").unwrap_or(128) as u32,
+                options,
             )?;
             let mut w = ResponseWriter::ok();
             w.put_i32("count", count as i32);

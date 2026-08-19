@@ -15,6 +15,7 @@ import 'package:pdf_manipulator/src/ops/pdf_standalone.dart';
 import 'package:pdf_manipulator/src/types/data_sink.dart';
 import 'package:pdf_manipulator/src/types/data_source.dart';
 import 'package:pdf_manipulator/src/types/pdf_enums.dart';
+import 'package:pdf_manipulator/src/types/pdf_image_optimization_options.dart';
 import 'package:pdf_manipulator/src/types/pdf_pages.dart';
 import 'package:pdf_manipulator/src/types/pdf_params.dart';
 import 'package:pdf_manipulator/src/types/pdf_rect.dart';
@@ -292,10 +293,15 @@ extension PdfSugar on Pdf {
     DataSource source,
     DataSink output, {
     int imageQuality = 75,
+    PdfImageOptimizationOptions? imageOptimizationOptions,
     bool garbageCollect = true,
   }) => PdfTask.group((hook) async {
     final editor = await hook.guard(edit(source));
-    await hook.guard(editor.optimizeImages(quality: imageQuality));
+    await hook.guard(
+      imageOptimizationOptions == null
+          ? editor.optimizeImages(quality: imageQuality)
+          : editor.optimizeImagesWithOptions(imageOptimizationOptions),
+    );
     await hook.guard(
       editor.save(
         output,

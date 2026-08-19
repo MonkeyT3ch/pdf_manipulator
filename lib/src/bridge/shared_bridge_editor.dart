@@ -156,6 +156,12 @@ class _SharedEditorHandle extends BridgeEditorHandle {
     {'editOp': 'optimizeImages', 'quality': quality, 'minSize': minSize},
   ).map((map) => map['count'] as int? ?? 0);
   @override
+  PdfTask<int> optimizeImagesWithOptions(PdfImageOptimizationOptions options) =>
+      _exec(EngineOp.editorMutate, {
+        'editOp': 'optimizeImages',
+        ...options.toWireMap(),
+      }).map((map) => map['count'] as int? ?? 0);
+  @override
   PdfTask<int> unembedStandardFonts() => _exec(EngineOp.editorMutate, {
     'editOp': 'unembedStandardFonts',
   }).map((map) => map['count'] as int? ?? 0);
