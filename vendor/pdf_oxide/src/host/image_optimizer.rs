@@ -134,7 +134,7 @@ pub fn optimize_images(
             continue;
         }
 
-        let components = match dict.get("ColorSpace").and_then(Object::as_name) {
+        let components = match resolved_color_space_name(source, &dict).as_deref() {
             Some("DeviceGray") => 1,
             Some("DeviceRGB") => 3,
             _ => continue,
@@ -495,7 +495,7 @@ fn resized_soft_mask(
             .and_then(Object::as_integer)
             .unwrap_or(8)
             != 8
-        || dict.get("ColorSpace").and_then(Object::as_name) != Some("DeviceGray")
+        || resolved_color_space_name(source, &dict).as_deref() != Some("DeviceGray")
         || dict.contains_key("Decode")
     {
         return None;
@@ -560,6 +560,21 @@ fn single_filter(dict: &HashMap<String, Object>) -> Option<&str> {
         None => Some(""),
         Some(Object::Name(name)) => Some(name),
         Some(Object::Array(filters)) if filters.len() == 1 => filters[0].as_name(),
+        _ => None,
+    }
+}
+
+fn resolved_color_space_name(
+    source: &PdfDocument,
+    dict: &HashMap<String, Object>,
+) -> Option<String> {
+    let color_space = dict.get("ColorSpace")?;
+    match color_space {
+        Object::Name(name) => Some(name.clone()),
+        Object::Reference(reference) => source
+            .load_object(*reference)
+            .ok()
+            .and_then(|object| object.as_name().map(ToOwned::to_owned)),
         _ => None,
     }
 }
