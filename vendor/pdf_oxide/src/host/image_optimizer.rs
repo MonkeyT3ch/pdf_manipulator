@@ -153,14 +153,10 @@ pub fn optimize_images(
             continue;
         }
 
-        let decoded = match (Object::Stream {
-            dict: dict.clone(),
-            data: bytes::Bytes::from(raw_data.clone()),
-        })
-        .decode_stream_data()
+        let decoded = match decode_image_pixels(&dict, &raw_data, filter, width, height, components)
         {
-            Ok(decoded) => decoded,
-            Err(_) => continue,
+            Some(decoded) => decoded,
+            None => continue,
         };
         let expected = width as usize * height as usize * components;
         if decoded.len() < expected {
@@ -441,6 +437,38 @@ fn resize_pixels(
     }
 }
 
+fn decode_image_pixels(
+    dict: &HashMap<String, Object>,
+    raw_data: &[u8],
+    filter: &str,
+    width: u32,
+    height: u32,
+    components: usize,
+) -> Option<Vec<u8>> {
+    if filter == "DCTDecode" {
+        let decoded =
+            image::load_from_memory_with_format(raw_data, image::ImageFormat::Jpeg).ok()?;
+        return match components {
+            1 => {
+                let pixels = decoded.to_luma8();
+                (pixels.dimensions() == (width, height)).then(|| pixels.into_raw())
+            },
+            3 => {
+                let pixels = decoded.to_rgb8();
+                (pixels.dimensions() == (width, height)).then(|| pixels.into_raw())
+            },
+            _ => None,
+        };
+    }
+
+    (Object::Stream {
+        dict: dict.clone(),
+        data: bytes::Bytes::copy_from_slice(raw_data),
+    })
+    .decode_stream_data()
+    .ok()
+}
+
 fn encode_jpeg(
     pixels: &[u8],
     width: u32,
@@ -593,6 +621,15 @@ fn beats_minimum_saving(candidate: usize, original: usize, minimum_ratio: f64) -
 mod tests {
     use super::*;
 
+    fn jpeg_pixels(width: u32, height: u32, components: usize) -> (Vec<u8>, Vec<u8>) {
+        let source = (0..width * height * components as u32)
+            .map(|index| (index.wrapping_mul(37) & 0xff) as u8)
+            .collect::<Vec<_>>();
+        let jpeg = encode_jpeg(&source, width, height, components, 90, ChromaSubsampling::Yuv444)
+            .expect("encode JPEG fixture");
+        (source, jpeg)
+    }
+
     fn options(target_dpi: f64) -> ImageOptimizationOptions {
         ImageOptimizationOptions {
             jpeg_quality: 75,
@@ -637,5 +674,15 @@ mod tests {
     fn one_percent_guard_is_inclusive() {
         assert!(beats_minimum_saving(990, 1000, 0.01));
         assert!(!beats_minimum_saving(991, 1000, 0.01));
+    }
+
+    #[test]
+    fn dct_image_streams_are_decoded_to_pixels_before_optimization() {
+        let (source, jpeg) = jpeg_pixels(16, 8, 3);
+        let decoded = decode_image_pixels(&HashMap::new(), &jpeg, "DCTDecode", 16, 8, 3)
+            .expect("decode JPEG image stream");
+
+        assert_eq!(decoded.len(), source.len());
+        assert_ne!(decoded, jpeg);
     }
 }
