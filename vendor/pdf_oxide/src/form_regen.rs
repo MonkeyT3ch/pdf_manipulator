@@ -46,10 +46,7 @@ impl PdfDocument {
             None => return false,
         };
         let af = self.resolve_object(af_ref).unwrap_or(Object::Null);
-        matches!(
-            af.as_dict().and_then(|d| d.get("NeedAppearances")),
-            Some(Object::Boolean(true))
-        )
+        matches!(af.as_dict().and_then(|d| d.get("NeedAppearances")), Some(Object::Boolean(true)))
     }
 
     /// The interactive form's default resource dictionary (`/DR`), resolved.

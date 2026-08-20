@@ -69,7 +69,12 @@ struct Budget {
 
 fn budget() -> &'static Mutex<Budget> {
     static BUDGET: OnceLock<Mutex<Budget>> = OnceLock::new();
-    BUDGET.get_or_init(|| Mutex::new(Budget { live: 0, waiters: VecDeque::new() }))
+    BUDGET.get_or_init(|| {
+        Mutex::new(Budget {
+            live: 0,
+            waiters: VecDeque::new(),
+        })
+    })
 }
 
 /// Returns the budget slot on thread exit — even on unwind, so a
@@ -88,23 +93,20 @@ impl Drop for SlotGuard {
                 // Then hand the slot to the next waiter.
                 Some(p) if p.controller.cancel.load(Ordering::SeqCst) => {
                     while let Ok(job) = p.mailbox.try_recv() {
-                        post_result(
-                            job.result_port,
-                            ResponseWriter::cancelled(),
-                        );
+                        post_result(job.result_port, ResponseWriter::cancelled());
                     }
                     p.controller.tickets.lock().unwrap().clear();
                     continue;
-                }
+                },
                 // Transfer the slot: `live` stays unchanged.
                 Some(p) => {
                     start_thread(p.key, p.mailbox, p.controller);
                     return;
-                }
+                },
                 None => {
                     b.live -= 1;
                     return;
-                }
+                },
             }
         }
     }
@@ -142,7 +144,11 @@ pub fn spawn() -> u64 {
         b.live += 1;
         start_thread(key, receiver, controller);
     } else {
-        b.waiters.push_back(PendingStart { key, controller, mailbox: receiver });
+        b.waiters.push_back(PendingStart {
+            key,
+            controller,
+            mailbox: receiver,
+        });
     }
 
     key
@@ -176,12 +182,12 @@ pub fn submit(lane_key: u64, job: Job) {
                 controller.tickets.lock().unwrap().remove(&job_id);
                 post_result(result_port, ResponseWriter::cancelled());
             }
-        }
+        },
         None => {
             // Killed between the table lookup and here.
             controller.tickets.lock().unwrap().remove(&job.job_id);
             post_result(job.result_port, ResponseWriter::cancelled());
-        }
+        },
     }
 }
 
@@ -646,9 +652,7 @@ mod tests {
         for &key in &keys {
             kill(key);
         }
-        assert!(wait_until(Duration::from_secs(10), || {
-            controller_for(last).is_none()
-        }));
+        assert!(wait_until(Duration::from_secs(10), || { controller_for(last).is_none() }));
     }
 
     #[test]

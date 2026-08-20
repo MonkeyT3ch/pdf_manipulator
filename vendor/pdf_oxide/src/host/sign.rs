@@ -43,14 +43,16 @@ pub(crate) fn sign_pdf(
     reader.seek(SeekFrom::End(-(tail_size as i64)))?;
     reader.read_exact(&mut tail)?;
 
-    let prev_startxref = scan_startxref(&tail)
-        .ok_or_else(|| Error::InvalidPdf("cannot find startxref".into()))?;
-    let root_ref_str = scan_root_ref(&tail)
-        .ok_or_else(|| Error::InvalidPdf("cannot find /Root ref".into()))?;
-    let next_obj = scan_next_obj_num(&tail)
-        .ok_or_else(|| Error::InvalidPdf("cannot find /Size".into()))?;
+    let prev_startxref =
+        scan_startxref(&tail).ok_or_else(|| Error::InvalidPdf("cannot find startxref".into()))?;
+    let root_ref_str =
+        scan_root_ref(&tail).ok_or_else(|| Error::InvalidPdf("cannot find /Root ref".into()))?;
+    let next_obj =
+        scan_next_obj_num(&tail).ok_or_else(|| Error::InvalidPdf("cannot find /Size".into()))?;
 
-    let catalog_id: u64 = root_ref_str.split_whitespace().next()
+    let catalog_id: u64 = root_ref_str
+        .split_whitespace()
+        .next()
         .and_then(|s| s.parse().ok())
         .ok_or_else(|| Error::InvalidPdf("cannot parse catalog ID".into()))?;
 
@@ -70,8 +72,8 @@ pub(crate) fn sign_pdf(
     // Read the /Pages reference from the original catalog so the
     // replacement preserves the page tree. Without this, the signed
     // PDF is structurally invalid (missing /Pages).
-    let pages_ref = scan_pages_ref(reader, catalog_id, prev_startxref)
-        .unwrap_or_else(|| "1 0 R".to_string());
+    let pages_ref =
+        scan_pages_ref(reader, catalog_id, prev_startxref).unwrap_or_else(|| "1 0 R".to_string());
     reader.seek(SeekFrom::Start(0))?;
 
     let catalog_str = format!(
@@ -92,20 +94,28 @@ pub(crate) fn sign_pdf(
     );
     let trailer_section = format!(
         "trailer\n<< /Size {} /Prev {} /Root {} 0 R >>\n",
-        field_obj + 1, prev_startxref, catalog_id,
+        field_obj + 1,
+        prev_startxref,
+        catalog_id,
     );
     let eof_section = format!("startxref\n{}\n%%EOF\n", xref_start);
 
     let total_len = src_len
-        + sig_dict.len() + field_str.len() + catalog_str.len()
-        + xref_section.len() + trailer_section.len() + eof_section.len();
+        + sig_dict.len()
+        + field_str.len()
+        + catalog_str.len()
+        + xref_section.len()
+        + trailer_section.len()
+        + eof_section.len();
 
     // ── 4. Compute ByteRange ────────────────────────────────────────
     let contents_abs = sig_start + contents_in_dict;
     let contents_size = signer.placeholder_size();
     let after_contents = contents_abs + contents_size;
     let byte_range: [i64; 4] = [
-        0, contents_abs as i64, after_contents as i64,
+        0,
+        contents_abs as i64,
+        after_contents as i64,
         (total_len - after_contents) as i64,
     ];
 
@@ -138,16 +148,16 @@ pub(crate) fn sign_pdf(
     let message_digest = hasher.finalize().to_vec();
 
     // ── 6. Build CMS blob from pre-computed digest ──────────────────
-    let cms_der = build_cms_from_digest(
-        credentials, &message_digest, DigestAlgorithm::Sha256,
-    )?;
+    let cms_der = build_cms_from_digest(credentials, &message_digest, DigestAlgorithm::Sha256)?;
 
     let hex = hex_encode(&cms_der);
     let pad_len = (contents_size - 2) - hex.len();
     let mut contents_val = String::with_capacity(contents_size);
     contents_val.push('<');
     contents_val.push_str(&hex);
-    for _ in 0..pad_len { contents_val.push('0'); }
+    for _ in 0..pad_len {
+        contents_val.push('0');
+    }
     contents_val.push('>');
 
     // ── 7. Write output — one pass, sequential ──────────────────────
@@ -200,9 +210,15 @@ fn build_cms_from_digest(
 
     let cert = X509Certificate::from_der(&credentials.certificate)
         .map_err(|e| Error::InvalidPdf(format!("cannot parse certificate: {e}")))?;
-    let issuer_der = cert.tbs_certificate.issuer.to_der()
+    let issuer_der = cert
+        .tbs_certificate
+        .issuer
+        .to_der()
         .map_err(|e| Error::InvalidPdf(format!("encode issuer: {e}")))?;
-    let serial_der = cert.tbs_certificate.serial_number.to_der()
+    let serial_der = cert
+        .tbs_certificate
+        .serial_number
+        .to_der()
         .map_err(|e| Error::InvalidPdf(format!("encode serial: {e}")))?;
 
     let rsa_key = RsaPrivateKey::from_pkcs8_der(&credentials.private_key)
@@ -240,7 +256,8 @@ fn build_cms_from_digest(
     let mut digest_info = Vec::with_capacity(di_prefix.len() + attrs_hash.len());
     digest_info.extend_from_slice(di_prefix);
     digest_info.extend_from_slice(&attrs_hash);
-    let sig_value = rsa_key.sign(Pkcs1v15Sign::new_unprefixed(), &digest_info)
+    let sig_value = rsa_key
+        .sign(Pkcs1v15Sign::new_unprefixed(), &digest_info)
         .map_err(|e| Error::InvalidPdf(format!("RSA sign failed: {e}")))?;
 
     // Build SignerInfo
@@ -299,7 +316,9 @@ fn scan_startxref(tail: &[u8]) -> Option<u64> {
     let after = &tail[pos + 9..];
     let s = std::str::from_utf8(after).ok()?;
     let trimmed = s.trim_start_matches([' ', '\r', '\n']);
-    let end = trimmed.find(|c: char| !c.is_ascii_digit()).unwrap_or(trimmed.len());
+    let end = trimmed
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(trimmed.len());
     trimmed[..end].parse().ok()
 }
 
@@ -308,7 +327,8 @@ fn scan_root_ref(tail: &[u8]) -> Option<String> {
     let pattern = b"/Root ";
     let pos = tail.windows(pattern.len()).rposition(|w| w == pattern)?;
     let after = &tail[pos + pattern.len()..];
-    let end = after.iter()
+    let end = after
+        .iter()
         .position(|&b| b == b'/' || b == b'>' || b == b'\n')
         .unwrap_or(after.len().min(40));
     let s = std::str::from_utf8(&after[..end]).ok()?.trim();
@@ -316,7 +336,11 @@ fn scan_root_ref(tail: &[u8]) -> Option<String> {
 }
 
 #[cfg(feature = "signatures")]
-fn scan_pages_ref(reader: &mut (impl std::io::Read + std::io::Seek), catalog_id: u64, xref_offset: u64) -> Option<String> {
+fn scan_pages_ref(
+    reader: &mut (impl std::io::Read + std::io::Seek),
+    catalog_id: u64,
+    xref_offset: u64,
+) -> Option<String> {
     use std::io::SeekFrom;
     // Read the xref table to find catalog object offset, then read
     // the catalog object to extract /Pages reference.
@@ -326,21 +350,28 @@ fn scan_pages_ref(reader: &mut (impl std::io::Read + std::io::Seek), catalog_id:
 
     // Read from the xref offset area backward to find the catalog
     let scan_size = 32768usize;
-    let scan_start = if xref_offset > scan_size as u64 { xref_offset - scan_size as u64 } else { 0 };
+    let scan_start = if xref_offset > scan_size as u64 {
+        xref_offset - scan_size as u64
+    } else {
+        0
+    };
     let mut buf = vec![0u8; (xref_offset as usize).min(scan_size)];
     reader.seek(SeekFrom::Start(scan_start)).ok()?;
     let n = reader.read(&mut buf).ok()?;
     let buf = &buf[..n];
 
     // Find the catalog object
-    let pos = buf.windows(header_bytes.len()).rposition(|w| w == header_bytes)?;
+    let pos = buf
+        .windows(header_bytes.len())
+        .rposition(|w| w == header_bytes)?;
     let after = &buf[pos..];
     let s = std::str::from_utf8(after).ok()?;
 
     // Extract /Pages N 0 R
     let pages_pos = s.find("/Pages ")?;
     let after_pages = &s[pages_pos + "/Pages ".len()..];
-    let end = after_pages.find(|c: char| c == '/' || c == '>' || c == '\n')
+    let end = after_pages
+        .find(|c: char| c == '/' || c == '>' || c == '\n')
         .unwrap_or(after_pages.len().min(40));
     let pages_ref = after_pages[..end].trim();
     (!pages_ref.is_empty()).then(|| pages_ref.to_string())
@@ -353,7 +384,9 @@ fn scan_next_obj_num(tail: &[u8]) -> Option<u64> {
     let after = &tail[pos + pattern.len()..];
     let s = std::str::from_utf8(after).ok()?;
     let trimmed = s.trim_start_matches(' ');
-    let end = trimmed.find(|c: char| !c.is_ascii_digit()).unwrap_or(trimmed.len());
+    let end = trimmed
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(trimmed.len());
     trimmed[..end].parse().ok()
 }
 
@@ -392,13 +425,21 @@ fn extract_cn_from_der(cert_der: &[u8]) -> Option<String> {
         if cert_der[i..i + 3] == cn_oid {
             // After OID: tag byte (0x0C=UTF8, 0x13=PrintableString) + length + value
             let val_start = i + 3;
-            if val_start + 2 > cert_der.len() { continue; }
+            if val_start + 2 > cert_der.len() {
+                continue;
+            }
             let tag = cert_der[val_start];
-            if tag != 0x0C && tag != 0x13 { continue; }
+            if tag != 0x0C && tag != 0x13 {
+                continue;
+            }
             let len = cert_der[val_start + 1] as usize;
             let data_start = val_start + 2;
-            if data_start + len > cert_der.len() { continue; }
-            return std::str::from_utf8(&cert_der[data_start..data_start + len]).ok().map(|s| s.to_string());
+            if data_start + len > cert_der.len() {
+                continue;
+            }
+            return std::str::from_utf8(&cert_der[data_start..data_start + len])
+                .ok()
+                .map(|s| s.to_string());
         }
     }
     None

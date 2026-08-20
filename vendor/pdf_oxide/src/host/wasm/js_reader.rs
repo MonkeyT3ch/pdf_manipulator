@@ -41,7 +41,11 @@ pub struct JsCallbackReader {
 impl JsCallbackReader {
     /// Create a reader for the source at `source_index`.
     pub fn new(source_index: u32, length: u64) -> Self {
-        Self { source_index, length, position: 0 }
+        Self {
+            source_index,
+            length,
+            position: 0,
+        }
     }
 }
 
@@ -52,7 +56,10 @@ impl Read for JsCallbackReader {
         }
 
         let remaining = self.length - self.position;
-        let to_read = buf.len().min(remaining as usize).min(crate::host::constants::READ_BUF_CAPACITY);
+        let to_read = buf
+            .len()
+            .min(remaining as usize)
+            .min(crate::host::constants::READ_BUF_CAPACITY);
 
         let n = host_read_at(
             self.source_index,
@@ -84,10 +91,7 @@ impl Seek for JsCallbackReader {
             SeekFrom::Current(offset) => self.position as i64 + offset,
         };
         if new_pos < 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "seek to negative position",
-            ));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "seek to negative position"));
         }
         self.position = new_pos as u64;
         Ok(self.position)

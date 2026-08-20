@@ -22,10 +22,20 @@ use crate::object::{Object, ObjectRef};
 use std::collections::HashMap;
 
 const STANDARD_14: &[&str] = &[
-    "Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique",
-    "Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique",
-    "Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic",
-    "Symbol", "ZapfDingbats",
+    "Courier",
+    "Courier-Bold",
+    "Courier-Oblique",
+    "Courier-BoldOblique",
+    "Helvetica",
+    "Helvetica-Bold",
+    "Helvetica-Oblique",
+    "Helvetica-BoldOblique",
+    "Times-Roman",
+    "Times-Bold",
+    "Times-Italic",
+    "Times-BoldItalic",
+    "Symbol",
+    "ZapfDingbats",
 ];
 
 /// Remove embedded font programs for Standard 14 fonts.

@@ -205,7 +205,9 @@ pub fn open_document(doc: &mut PdfDocument) -> Result<OpenResult> {
 
     let mut pages = Vec::with_capacity(page_count);
     for i in 0..page_count {
-        let (x0, y0, x1, y1) = doc.get_page_media_box(i).unwrap_or((0.0, 0.0, 612.0, 792.0));
+        let (x0, y0, x1, y1) = doc
+            .get_page_media_box(i)
+            .unwrap_or((0.0, 0.0, 612.0, 792.0));
         let rotation = doc.get_page_rotation(i).unwrap_or(0);
         pages.push(PageInfo {
             width: (x1 - x0) as f64,
@@ -223,16 +225,31 @@ pub fn open_document(doc: &mut PdfDocument) -> Result<OpenResult> {
     let creation_date = doc.document_info_string("CreationDate").unwrap_or_default();
 
     Ok(OpenResult {
-        page_count, version_major: major, version_minor: minor,
-        is_encrypted, requires_password, is_tagged,
-        encryption_algorithm: enc_algo, permission_bits: perms,
-        pages, title, author, subject, keywords,
-        producer, creator, creation_date,
+        page_count,
+        version_major: major,
+        version_minor: minor,
+        is_encrypted,
+        requires_password,
+        is_tagged,
+        encryption_algorithm: enc_algo,
+        permission_bits: perms,
+        pages,
+        title,
+        author,
+        subject,
+        keywords,
+        producer,
+        creator,
+        creation_date,
     })
 }
 
 /// Extract text from one page or all pages in the given format.
-pub fn extract_text(doc: &mut PdfDocument, page: Option<usize>, format: &str) -> Result<ExtractTextResult> {
+pub fn extract_text(
+    doc: &mut PdfDocument,
+    page: Option<usize>,
+    format: &str,
+) -> Result<ExtractTextResult> {
     let text = match format {
         "markdown" => {
             let opts = crate::converters::ConversionOptions::default();
@@ -240,7 +257,7 @@ pub fn extract_text(doc: &mut PdfDocument, page: Option<usize>, format: &str) ->
                 None => doc.to_markdown_all(&opts)?,
                 Some(i) => doc.to_markdown(i, &opts)?,
             }
-        }
+        },
         "html" => {
             let opts = crate::converters::ConversionOptions::default();
             match page {
@@ -248,40 +265,46 @@ pub fn extract_text(doc: &mut PdfDocument, page: Option<usize>, format: &str) ->
                     let count = doc.page_count()?;
                     let mut all = String::new();
                     for i in 0..count {
-                        if i > 0 { all.push('\n'); }
+                        if i > 0 {
+                            all.push('\n');
+                        }
                         all.push_str(&doc.to_html(i, &opts)?);
                     }
                     all
-                }
+                },
                 Some(i) => doc.to_html(i, &opts)?,
             }
-        }
-        _ => {
-            match page {
-                None => {
-                    let count = doc.page_count()?;
-                    let mut all = String::new();
-                    for i in 0..count {
-                        if i > 0 { all.push('\n'); }
-                        all.push_str(&doc.extract_text(i)?);
+        },
+        _ => match page {
+            None => {
+                let count = doc.page_count()?;
+                let mut all = String::new();
+                for i in 0..count {
+                    if i > 0 {
+                        all.push('\n');
                     }
-                    all
+                    all.push_str(&doc.extract_text(i)?);
                 }
-                Some(i) => doc.extract_text(i)?,
-            }
-        }
+                all
+            },
+            Some(i) => doc.extract_text(i)?,
+        },
     };
     Ok(ExtractTextResult { text })
 }
 
 /// Search for text across the document, optionally filtered to one page.
-pub fn search_text(doc: &mut PdfDocument, query: &str, page: Option<usize>) -> Result<SearchResult> {
+pub fn search_text(
+    doc: &mut PdfDocument,
+    query: &str,
+    page: Option<usize>,
+) -> Result<SearchResult> {
     use crate::search::{SearchOptions, TextSearcher};
     let opts = SearchOptions::default();
     let all_hits = TextSearcher::search(doc, query, &opts)?;
     let hits: Vec<SearchHit> = all_hits
         .into_iter()
-        .filter(|h| page.map_or(true, |p| h.page == p))
+        .filter(|h| page.is_none_or(|p| h.page == p))
         .map(|h| SearchHit {
             page: h.page,
             text: h.text,
@@ -299,15 +322,20 @@ pub fn get_signatures(_doc: &mut PdfDocument) -> Result<SignaturesResult> {
     #[cfg(feature = "signatures")]
     {
         let sigs = crate::signatures::enumerate_signatures(_doc)?;
-        let signatures = sigs.iter().map(|s| SignatureInfo {
-            signer_name: s.signer_name.clone().unwrap_or_default(),
-            reason: s.reason.clone().unwrap_or_default(),
-            location: s.location.clone().unwrap_or_default(),
-        }).collect();
+        let signatures = sigs
+            .iter()
+            .map(|s| SignatureInfo {
+                signer_name: s.signer_name.clone().unwrap_or_default(),
+                reason: s.reason.clone().unwrap_or_default(),
+                location: s.location.clone().unwrap_or_default(),
+            })
+            .collect();
         Ok(SignaturesResult { signatures })
     }
     #[cfg(not(feature = "signatures"))]
-    { Ok(SignaturesResult { signatures: vec![] }) }
+    {
+        Ok(SignaturesResult { signatures: vec![] })
+    }
 }
 
 /// Verify digital signatures (stub — always returns false).
@@ -329,7 +357,11 @@ pub fn validate_pdf_a(doc: &mut PdfDocument, level: i32) -> Result<ValidationRes
             errors: v.errors.len() as i32,
             warnings: v.warnings.len() as i32,
         }),
-        Err(_) => Ok(ValidationResult { compliant: false, errors: -1, warnings: 0 }),
+        Err(_) => Ok(ValidationResult {
+            compliant: false,
+            errors: -1,
+            warnings: 0,
+        }),
     }
 }
 
@@ -340,19 +372,25 @@ pub fn validate_pdf_ua(doc: &mut PdfDocument, level: i32) -> Result<bool> {
         2 => PdfUaLevel::Ua2,
         _ => PdfUaLevel::Ua1,
     };
-    Ok(do_validate(doc, ua_level).map(|r| r.is_compliant).unwrap_or(false))
+    Ok(do_validate(doc, ua_level)
+        .map(|r| r.is_compliant)
+        .unwrap_or(false))
 }
 
 /// Classify a single page's content type.
 pub fn classify_page(doc: &mut PdfDocument, page: usize) -> Result<ClassificationResult> {
     let classification = doc.classify_page(page)?;
-    Ok(ClassificationResult { type_name: format!("{:?}", classification) })
+    Ok(ClassificationResult {
+        type_name: format!("{:?}", classification),
+    })
 }
 
 /// Classify the overall document type.
 pub fn classify_document(doc: &mut PdfDocument) -> Result<ClassificationResult> {
     let classification = doc.classify_document()?;
-    Ok(ClassificationResult { type_name: format!("{:?}", classification) })
+    Ok(ClassificationResult {
+        type_name: format!("{:?}", classification),
+    })
 }
 
 /// Plan bookmark-based page ranges for splitting the document.
@@ -360,16 +398,24 @@ pub fn plan_split_by_bookmarks(doc: &mut PdfDocument) -> Result<Vec<BookmarkSpli
     use crate::split_bookmarks::{plan_split_by_bookmarks as do_plan, SplitByBookmarksOptions};
     let opts = SplitByBookmarksOptions::default();
     let splits = do_plan(doc, &opts)?;
-    Ok(splits.iter().map(|s| BookmarkSplit {
-        title: s.title.clone().unwrap_or_default(),
-        start_page: s.start_page,
-        end_page: s.end_page,
-    }).collect())
+    Ok(splits
+        .iter()
+        .map(|s| BookmarkSplit {
+            title: s.title.clone().unwrap_or_default(),
+            start_page: s.start_page,
+            end_page: s.end_page,
+        })
+        .collect())
 }
 
 /// Render a page to a PNG-encoded image, optionally constrained to max
 /// dimensions. Uses the default render options (PNG output).
-pub fn render_page(doc: &mut PdfDocument, page: usize, max_width: u32, max_height: u32) -> Result<RenderedPage> {
+pub fn render_page(
+    doc: &mut PdfDocument,
+    page: usize,
+    max_width: u32,
+    max_height: u32,
+) -> Result<RenderedPage> {
     #[cfg(feature = "rendering")]
     {
         use crate::rendering::{render_page as do_render, render_page_fit, RenderOptions};
@@ -395,20 +441,25 @@ pub fn render_page(doc: &mut PdfDocument, page: usize, max_width: u32, max_heigh
 /// Extract all images from a page as decoded pixel data.
 pub fn extract_images(doc: &mut PdfDocument, page: usize) -> Result<Vec<ExtractedImage>> {
     let images = doc.extract_images(page)?;
-    Ok(images.into_iter().map(|img| {
-        let (fmt, data) = match img.data() {
-            crate::extractors::ImageData::Jpeg(bytes) => ("jpeg".to_string(), bytes.to_vec()),
-            crate::extractors::ImageData::Raw { pixels, .. } => ("raw".to_string(), pixels.to_vec()),
-        };
-        ExtractedImage {
-            width: img.width() as u32,
-            height: img.height() as u32,
-            format: fmt,
-            color_space: format!("{:?}", img.color_space()),
-            bits_per_component: img.bits_per_component() as u32,
-            data,
-        }
-    }).collect())
+    Ok(images
+        .into_iter()
+        .map(|img| {
+            let (fmt, data) = match img.data() {
+                crate::extractors::ImageData::Jpeg(bytes) => ("jpeg".to_string(), bytes.to_vec()),
+                crate::extractors::ImageData::Raw { pixels, .. } => {
+                    ("raw".to_string(), pixels.to_vec())
+                },
+            };
+            ExtractedImage {
+                width: img.width(),
+                height: img.height(),
+                format: fmt,
+                color_space: format!("{:?}", img.color_space()),
+                bits_per_component: img.bits_per_component() as u32,
+                data,
+            }
+        })
+        .collect())
 }
 
 /// O(1)-memory streaming image extraction.
@@ -441,12 +492,18 @@ pub fn extract_images_streamed<W: std::io::Write>(
         w.put_bytes("data", &data);
         let frame = w.finish();
         let len_bytes = (frame.len() as u32).to_le_bytes();
-        writer.write_all(&len_bytes).map_err(|e| Error::InvalidPdf(e.to_string()))?;
-        writer.write_all(&frame).map_err(|e| Error::InvalidPdf(e.to_string()))?;
+        writer
+            .write_all(&len_bytes)
+            .map_err(|e| Error::InvalidPdf(e.to_string()))?;
+        writer
+            .write_all(&frame)
+            .map_err(|e| Error::InvalidPdf(e.to_string()))?;
         // image data dropped here — only one image in memory at a time
     }
     // A zero-length frame terminates the stream.
-    writer.write_all(&0u32.to_le_bytes()).map_err(|e| Error::InvalidPdf(e.to_string()))?;
+    writer
+        .write_all(&0u32.to_le_bytes())
+        .map_err(|e| Error::InvalidPdf(e.to_string()))?;
     Ok(count)
 }
 
@@ -475,12 +532,18 @@ pub fn render_pages_streamed<W: std::io::Write>(
         w.put_bytes("data", &result.data);
         let frame = w.finish();
         let len_bytes = (frame.len() as u32).to_le_bytes();
-        writer.write_all(&len_bytes).map_err(|e| Error::InvalidPdf(e.to_string()))?;
-        writer.write_all(&frame).map_err(|e| Error::InvalidPdf(e.to_string()))?;
+        writer
+            .write_all(&len_bytes)
+            .map_err(|e| Error::InvalidPdf(e.to_string()))?;
+        writer
+            .write_all(&frame)
+            .map_err(|e| Error::InvalidPdf(e.to_string()))?;
         // encoded page dropped here — only one page in memory at a time
     }
     // A zero-length frame terminates the stream.
-    writer.write_all(&0u32.to_le_bytes()).map_err(|e| Error::InvalidPdf(e.to_string()))?;
+    writer
+        .write_all(&0u32.to_le_bytes())
+        .map_err(|e| Error::InvalidPdf(e.to_string()))?;
     Ok(count)
 }
 
@@ -511,7 +574,10 @@ pub fn edit_is_modified(editor: &DocumentEditor) -> bool {
 }
 
 /// Get the media box (x, y, width, height) for a page.
-pub fn edit_page_media_box(editor: &mut DocumentEditor, page: usize) -> Result<(f32, f32, f32, f32)> {
+pub fn edit_page_media_box(
+    editor: &mut DocumentEditor,
+    page: usize,
+) -> Result<(f32, f32, f32, f32)> {
     let mb = editor.get_page_media_box(page)?;
     Ok((mb[0], mb[1], mb[2], mb[3]))
 }
@@ -620,9 +686,8 @@ pub fn edit_optimize_images(
     #[cfg(feature = "rendering")]
     {
         let mut mods = std::collections::HashMap::new();
-        let count = crate::host::image_optimizer::optimize_images(
-            editor.source(), &mut mods, &options,
-        )?;
+        let count =
+            crate::host::image_optimizer::optimize_images(editor.source(), &mut mods, &options)?;
         for (id, obj) in mods {
             editor.insert_modified(id, obj);
         }
@@ -638,9 +703,7 @@ pub fn edit_optimize_images(
 /// Remove embedded copies of the 14 standard PDF fonts. Returns count unembedded.
 pub fn edit_unembed_standard_fonts(editor: &mut DocumentEditor) -> Result<usize> {
     let mut mods = std::collections::HashMap::new();
-    let count = crate::host::font_optimizer::unembed_standard_fonts(
-        editor.source(), &mut mods,
-    )?;
+    let count = crate::host::font_optimizer::unembed_standard_fonts(editor.source(), &mut mods)?;
     for (id, obj) in mods {
         editor.insert_modified(id, obj);
     }
@@ -653,7 +716,11 @@ pub fn edit_embed_file(editor: &mut DocumentEditor, name: &str, data: Vec<u8>) -
 }
 
 /// Erase rectangular regions from a page's content.
-pub fn edit_erase_regions(editor: &mut DocumentEditor, page: usize, rects: &[[f32; 4]]) -> Result<()> {
+pub fn edit_erase_regions(
+    editor: &mut DocumentEditor,
+    page: usize,
+    rects: &[[f32; 4]],
+) -> Result<()> {
     // Destructive by contract: the public op promises the covered
     // content is GONE from the file, not painted over. The cosmetic
     // overlay (`erase_regions`) leaves every glyph extractable.
@@ -661,18 +728,34 @@ pub fn edit_erase_regions(editor: &mut DocumentEditor, page: usize, rects: &[[f3
 }
 
 /// Crop all pages by the given margin insets (in points).
-pub fn edit_crop_margins(editor: &mut DocumentEditor, left: f32, right: f32, top: f32, bottom: f32) -> Result<()> {
+pub fn edit_crop_margins(
+    editor: &mut DocumentEditor,
+    left: f32,
+    right: f32,
+    top: f32,
+    bottom: f32,
+) -> Result<()> {
     editor.crop_margins(left, right, top, bottom)
 }
 
 /// Set a form field's value by field name.
-pub fn edit_set_form_field_value(editor: &mut DocumentEditor, name: &str, value: &str) -> Result<()> {
+pub fn edit_set_form_field_value(
+    editor: &mut DocumentEditor,
+    name: &str,
+    value: &str,
+) -> Result<()> {
     use crate::editor::form_fields::FormFieldValue;
     editor.set_form_field_value(name, FormFieldValue::Text(value.to_string()))
 }
 
 /// Resize a named image XObject on a page.
-pub fn edit_resize_image(editor: &mut DocumentEditor, page: usize, name: &str, width: f32, height: f32) -> Result<()> {
+pub fn edit_resize_image(
+    editor: &mut DocumentEditor,
+    page: usize,
+    name: &str,
+    width: f32,
+    height: f32,
+) -> Result<()> {
     editor.resize_image(page, name, width, height)
 }
 
@@ -754,10 +837,10 @@ pub fn edit_save_encrypted(
     user_password: &str,
     owner_password: Option<&str>,
 ) -> Result<Vec<u8>> {
-    use crate::editor::{SaveOptions, EncryptionConfig, EncryptionAlgorithm};
+    use crate::editor::{EncryptionAlgorithm, EncryptionConfig, SaveOptions};
     let owner_pwd = owner_password.unwrap_or(user_password);
-    let config = EncryptionConfig::new(user_password, owner_pwd)
-        .with_algorithm(EncryptionAlgorithm::Aes256);
+    let config =
+        EncryptionConfig::new(user_password, owner_pwd).with_algorithm(EncryptionAlgorithm::Aes256);
     let options = SaveOptions::with_encryption(config);
     editor.save_to_bytes_with_options(options)
 }
@@ -767,7 +850,11 @@ pub fn edit_save_encrypted(
 // ═══════════════════════════════════════════════════════════════════
 
 /// Convert a PDF to an office format, streaming output to a writer.
-pub fn convert_to_format_writer<W: std::io::Write>(doc: &PdfDocument, format: &str, writer: &mut W) -> Result<()> {
+pub fn convert_to_format_writer<W: std::io::Write>(
+    doc: &PdfDocument,
+    format: &str,
+    writer: &mut W,
+) -> Result<()> {
     match format {
         "docx" => doc.to_docx_writer_flow(writer),
         "pptx" => doc.to_pptx_writer_flow(writer),
@@ -787,8 +874,13 @@ pub fn convert_to_format(doc: &PdfDocument, format: &str) -> Result<Vec<u8>> {
 }
 
 /// Convert an office document to PDF, streaming output to a writer.
-pub fn convert_from_format_writer<R: std::io::Read + std::io::Seek + Send + 'static, W: std::io::Write>(
-    reader: R, format: &str, writer: &mut W,
+pub fn convert_from_format_writer<
+    R: std::io::Read + std::io::Seek + Send + 'static,
+    W: std::io::Write,
+>(
+    reader: R,
+    format: &str,
+    writer: &mut W,
 ) -> Result<()> {
     let converter = crate::converters::office::OfficeConverter::new();
     match format {
@@ -806,7 +898,6 @@ pub fn convert_from_format_to_bytes(data: &[u8], format: &str) -> Result<Vec<u8>
     Ok(buf.into_inner())
 }
 
-
 // ═══════════════════════════════════════════════════════════════════
 // Watermark + stamp — uses page_editor().add_annotation().
 // No upstream patch. Uses only public APIs.
@@ -814,13 +905,21 @@ pub fn convert_from_format_to_bytes(data: &[u8], format: &str) -> Result<Vec<u8>
 
 /// Add a text watermark to one page (page >= 0) or all pages (page < 0).
 pub fn edit_watermark(
-    editor: &mut DocumentEditor, page: i32, text: &str,
-    font_size: f32, rotation: f32, opacity: f32,
-    r: f32, g: f32, b: f32,
-    layer: i32, pos_type: i32, pos_fields: &[f32],
+    editor: &mut DocumentEditor,
+    page: i32,
+    text: &str,
+    font_size: f32,
+    rotation: f32,
+    opacity: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+    layer: i32,
+    pos_type: i32,
+    pos_fields: &[f32],
 ) -> Result<()> {
-    use crate::writer::WatermarkAnnotation;
     use crate::geometry::Rect;
+    use crate::writer::WatermarkAnnotation;
 
     let resolve_rect = |ed: &mut DocumentEditor, p: usize| -> Result<Vec<Rect>> {
         let mb = ed.get_page_media_box(p)?;
@@ -840,7 +939,7 @@ pub fn edit_watermark(
                     _ => Rect::new(pw - mx - tw, my, tw, th),
                 };
                 Ok(vec![rect])
-            }
+            },
             2 => {
                 let cols = pos_fields.first().copied().unwrap_or(3.0).max(1.0) as usize;
                 let rows = pos_fields.get(1).copied().unwrap_or(4.0).max(1.0) as usize;
@@ -853,14 +952,14 @@ pub fn edit_watermark(
                     }
                 }
                 Ok(rects)
-            }
+            },
             3 => {
                 let x = pos_fields.first().copied().unwrap_or(0.0);
                 let y = pos_fields.get(1).copied().unwrap_or(0.0);
                 let w = pos_fields.get(2).copied().unwrap_or(100.0);
                 let h = pos_fields.get(3).copied().unwrap_or(50.0);
                 Ok(vec![Rect::new(x, y, w, h)])
-            }
+            },
             _ => Ok(vec![Rect::new(pw * 0.1, ph * 0.3, pw * 0.8, ph * 0.4)]),
         }
     };
@@ -873,8 +972,7 @@ pub fn edit_watermark(
             let font_res = ensure_page_font(ed, p, "Helvetica")?;
             for rect in &rects {
                 let stream = generate_watermark_stream(
-                    text, *rect, font_size, rotation, opacity, r, g, b,
-                    &font_res,
+                    text, *rect, font_size, rotation, opacity, r, g, b, &font_res,
                 );
                 prepend_to_page_content(ed, p, &stream)?;
             }
@@ -914,7 +1012,7 @@ pub fn edit_watermark(
                         2 => Rect::new(mx, my, tw, th),
                         _ => Rect::new(pw - mx - tw, my, tw, th),
                     }]
-                }
+                },
                 2 => {
                     let cols = pos_fields.first().copied().unwrap_or(3.0).max(1.0) as usize;
                     let rows = pos_fields.get(1).copied().unwrap_or(4.0).max(1.0) as usize;
@@ -927,22 +1025,21 @@ pub fn edit_watermark(
                         }
                     }
                     r
-                }
+                },
                 3 => {
                     let x = pos_fields.first().copied().unwrap_or(0.0);
                     let y = pos_fields.get(1).copied().unwrap_or(0.0);
                     let w = pos_fields.get(2).copied().unwrap_or(100.0);
                     let h = pos_fields.get(3).copied().unwrap_or(50.0);
                     vec![Rect::new(x, y, w, h)]
-                }
+                },
                 _ => vec![Rect::new(pw * 0.1, ph * 0.3, pw * 0.8, ph * 0.4)],
             };
             if layer == 1 {
                 let font_res = ensure_page_font(editor, i, "Helvetica")?;
                 for rect in &rects {
                     let stream = generate_watermark_stream(
-                        text, *rect, font_size, rotation, opacity, r, g, b,
-                        &font_res,
+                        text, *rect, font_size, rotation, opacity, r, g, b, &font_res,
                     );
                     prepend_to_page_content(editor, i, &stream)?;
                 }
@@ -971,7 +1068,9 @@ fn generate_watermark_stream(
     font_size: f32,
     rotation: f32,
     opacity: f32,
-    r: f32, g: f32, b: f32,
+    r: f32,
+    g: f32,
+    b: f32,
     font_res: &str,
 ) -> Vec<u8> {
     let cx = rect.x + rect.width / 2.0;
@@ -985,18 +1084,30 @@ fn generate_watermark_stream(
     let ab = if opacity < 1.0 { b * opacity } else { b };
 
     let approx_width = text.len() as f32 * font_size * 0.5;
-    let escaped = text.replace('\\', "\\\\").replace('(', "\\(").replace(')', "\\)");
+    let escaped = text
+        .replace('\\', "\\\\")
+        .replace('(', "\\(")
+        .replace(')', "\\)");
 
     format!(
         "q\n{:.2} {:.2} {:.2} rg\n{:.4} {:.4} {:.4} {:.4} {:.2} {:.2} cm\n\
          BT\n/{} {:.1} Tf\n{:.2} {:.2} Td\n({}) Tj\nET\nQ\n",
-        ar, ag, ab,
-        cos_r, sin_r, -sin_r, cos_r, cx, cy,
+        ar,
+        ag,
+        ab,
+        cos_r,
+        sin_r,
+        -sin_r,
+        cos_r,
+        cx,
+        cy,
         font_res,
         font_size,
-        -approx_width / 2.0, -font_size / 3.0,
+        -approx_width / 2.0,
+        -font_size / 3.0,
         escaped,
-    ).into_bytes()
+    )
+    .into_bytes()
 }
 
 /// Ensure the page's `/Resources/Font` maps a resource name to
@@ -1007,19 +1118,13 @@ fn generate_watermark_stream(
 /// `/Resources/Font` — not a typeface name. Emitting a stream without
 /// registering its font produces spec-invalid output that extractors
 /// and strict viewers cannot decode.
-fn ensure_page_font(
-    editor: &mut DocumentEditor,
-    page: usize,
-    base_font: &str,
-) -> Result<String> {
+fn ensure_page_font(editor: &mut DocumentEditor, page: usize, base_font: &str) -> Result<String> {
     use crate::object::{Object, ObjectRef};
 
     let page_ref = editor.source_mut().get_page_ref(page)?;
     // Staged-preferred: an earlier edit on this editor may already have
     // replaced the page dict; loading from source would drop that work.
-    let page_obj = if let Some(staged) =
-        editor.modified_objects_mut().get(&page_ref.id)
-    {
+    let page_obj = if let Some(staged) = editor.modified_objects_mut().get(&page_ref.id) {
         staged.clone()
     } else {
         editor.source_mut().load_object(page_ref)?
@@ -1039,9 +1144,7 @@ fn ensure_page_font(
             Some(Object::Dictionary(d)) => Ok(d.clone()),
             Some(Object::Reference(r)) => {
                 let r = *r;
-                let obj = if let Some(staged) =
-                    editor.modified_objects_mut().get(&r.id)
-                {
+                let obj = if let Some(staged) = editor.modified_objects_mut().get(&r.id) {
                     staged.clone()
                 } else {
                     editor.source_mut().load_object(r)?
@@ -1050,7 +1153,7 @@ fn ensure_page_font(
                     Object::Dictionary(d) => d,
                     _ => std::collections::HashMap::new(),
                 })
-            }
+            },
             _ => Ok(std::collections::HashMap::new()),
         }
     }
@@ -1063,8 +1166,7 @@ fn ensure_page_font(
         let font_obj = match value {
             Object::Dictionary(d) => Object::Dictionary(d),
             Object::Reference(r) => {
-                if let Some(staged) = editor.modified_objects_mut().get(&r.id)
-                {
+                if let Some(staged) = editor.modified_objects_mut().get(&r.id) {
                     staged.clone()
                 } else {
                     match editor.source_mut().load_object(r) {
@@ -1072,7 +1174,7 @@ fn ensure_page_font(
                         Err(_) => continue, // unreadable entry: skip, register fresh
                     }
                 }
-            }
+            },
             _ => continue,
         };
         if let Some(d) = font_obj.as_dict() {
@@ -1136,24 +1238,26 @@ fn prepend_to_page_content(
     // Staged-preferred: ensure_page_font (and any earlier prepend) stages
     // an updated page dict; loading from source would drop that work and
     // re-resolve a stale Contents value.
-    let page_obj = if let Some(staged) =
-        editor.modified_objects_mut().get(&page_ref.id)
-    {
+    let page_obj = if let Some(staged) = editor.modified_objects_mut().get(&page_ref.id) {
         staged.clone()
     } else {
         editor.source_mut().load_object(page_ref)?
     };
-    let page_dict = page_obj.as_dict()
+    let page_dict = page_obj
+        .as_dict()
         .ok_or_else(|| Error::InvalidPdf("page not a dict".into()))?;
 
     // Stage the new under-content stream as its own object.
     let mut content_dict = std::collections::HashMap::new();
     content_dict.insert("Length".into(), Object::Integer(stream_bytes.len() as i64));
     let content_id = editor.alloc_id();
-    editor.insert_modified(content_id, Object::Stream {
-        dict: content_dict,
-        data: bytes::Bytes::from(stream_bytes.to_vec()),
-    });
+    editor.insert_modified(
+        content_id,
+        Object::Stream {
+            dict: content_dict,
+            data: bytes::Bytes::from(stream_bytes.to_vec()),
+        },
+    );
     let new_ref = Object::Reference(ObjectRef::new(content_id, 0));
 
     // /Contents = [new, ...existing]. A direct (non-reference) existing
@@ -1166,18 +1270,13 @@ fn prepend_to_page_content(
             arr.push(new_ref);
             arr.extend(existing.iter().cloned());
             Object::Array(arr)
-        }
-        Some(r @ Object::Reference(_)) => {
-            Object::Array(vec![new_ref, r.clone()])
-        }
+        },
+        Some(r @ Object::Reference(_)) => Object::Array(vec![new_ref, r.clone()]),
         Some(direct @ Object::Stream { .. }) => {
             let hoisted_id = editor.alloc_id();
             editor.insert_modified(hoisted_id, direct.clone());
-            Object::Array(vec![
-                new_ref,
-                Object::Reference(ObjectRef::new(hoisted_id, 0)),
-            ])
-        }
+            Object::Array(vec![new_ref, Object::Reference(ObjectRef::new(hoisted_id, 0))])
+        },
         Some(_) => new_ref, // malformed /Contents: the overlay becomes the content
     };
 
@@ -1190,8 +1289,14 @@ fn prepend_to_page_content(
 
 /// Add a standard stamp annotation to a page.
 pub fn edit_add_stamp(
-    editor: &mut DocumentEditor, page: usize, stamp_type: i32,
-    x: f32, y: f32, w: f32, h: f32, opacity: f32,
+    editor: &mut DocumentEditor,
+    page: usize,
+    stamp_type: i32,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    opacity: f32,
 ) -> Result<()> {
     use crate::geometry::Rect;
     let rect = Rect::new(x, y, x + w, y + h);
@@ -1209,8 +1314,14 @@ pub fn edit_add_stamp(
 /// Add an image stamp — builds appearance stream directly from image bytes.
 /// Uses editor's pub(crate) alloc_id + insert_modified to place objects.
 pub fn edit_add_image_stamp(
-    editor: &mut DocumentEditor, page: usize, image_bytes: Vec<u8>,
-    x: f32, y: f32, w: f32, h: f32, opacity: f32,
+    editor: &mut DocumentEditor,
+    page: usize,
+    image_bytes: Vec<u8>,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    opacity: f32,
 ) -> Result<()> {
     use crate::object::Object;
     use crate::writer::ImageData;
@@ -1230,29 +1341,31 @@ pub fn edit_add_image_stamp(
         (img.build_soft_mask_dict(), img.soft_mask.clone())
     {
         let smask_id = editor.alloc_id();
-        editor.insert_modified(smask_id, Object::Stream {
-            dict: smask_dict,
-            data: bytes::Bytes::from(smask_data),
-        });
-        img_dict.insert(
-            "SMask".into(),
-            Object::Reference(crate::object::ObjectRef::new(smask_id, 0)),
+        editor.insert_modified(
+            smask_id,
+            Object::Stream {
+                dict: smask_dict,
+                data: bytes::Bytes::from(smask_data),
+            },
         );
+        img_dict
+            .insert("SMask".into(), Object::Reference(crate::object::ObjectRef::new(smask_id, 0)));
     }
 
     let img_id = editor.alloc_id();
-    editor.insert_modified(img_id, Object::Stream {
-        dict: img_dict,
-        data: bytes::Bytes::from(img.data),
-    });
+    editor.insert_modified(
+        img_id,
+        Object::Stream {
+            dict: img_dict,
+            data: bytes::Bytes::from(img.data),
+        },
+    );
 
     // Form XObject (appearance stream) — draws the image scaled to rect
     let content = format!("q\n{} 0 0 {} 0 0 cm\n/Im0 Do\nQ\n", w, h);
 
     let mut xobjects = std::collections::HashMap::new();
-    xobjects.insert("Im0".into(), Object::Reference(
-        crate::object::ObjectRef::new(img_id, 0),
-    ));
+    xobjects.insert("Im0".into(), Object::Reference(crate::object::ObjectRef::new(img_id, 0)));
     let mut resources = std::collections::HashMap::new();
     resources.insert("XObject".into(), Object::Dictionary(xobjects));
 
@@ -1269,32 +1382,43 @@ pub fn edit_add_image_stamp(
     let mut form_dict = std::collections::HashMap::new();
     form_dict.insert("Type".into(), Object::Name("XObject".into()));
     form_dict.insert("Subtype".into(), Object::Name("Form".into()));
-    form_dict.insert("BBox".into(), Object::Array(vec![
-        Object::Real(0.0), Object::Real(0.0),
-        Object::Real(w as f64), Object::Real(h as f64),
-    ]));
+    form_dict.insert(
+        "BBox".into(),
+        Object::Array(vec![
+            Object::Real(0.0),
+            Object::Real(0.0),
+            Object::Real(w as f64),
+            Object::Real(h as f64),
+        ]),
+    );
     form_dict.insert("Resources".into(), Object::Dictionary(resources));
     form_dict.insert("Length".into(), Object::Integer(content.len() as i64));
 
     let form_id = editor.alloc_id();
-    editor.insert_modified(form_id, Object::Stream {
-        dict: form_dict,
-        data: bytes::Bytes::from(content),
-    });
+    editor.insert_modified(
+        form_id,
+        Object::Stream {
+            dict: form_dict,
+            data: bytes::Bytes::from(content),
+        },
+    );
 
     // Stamp annotation dict with appearance
     let mut ap = std::collections::HashMap::new();
-    ap.insert("N".into(), Object::Reference(
-        crate::object::ObjectRef::new(form_id, 0),
-    ));
+    ap.insert("N".into(), Object::Reference(crate::object::ObjectRef::new(form_id, 0)));
 
     let mut annot = std::collections::HashMap::new();
     annot.insert("Type".into(), Object::Name("Annot".into()));
     annot.insert("Subtype".into(), Object::Name("Stamp".into()));
-    annot.insert("Rect".into(), Object::Array(vec![
-        Object::Real(x as f64), Object::Real(y as f64),
-        Object::Real((x + w) as f64), Object::Real((y + h) as f64),
-    ]));
+    annot.insert(
+        "Rect".into(),
+        Object::Array(vec![
+            Object::Real(x as f64),
+            Object::Real(y as f64),
+            Object::Real((x + w) as f64),
+            Object::Real((y + h) as f64),
+        ]),
+    );
     annot.insert("Name".into(), Object::Name("ImageStamp".into()));
     annot.insert("F".into(), Object::Integer(132)); // Print + ReadOnly
     annot.insert("AP".into(), Object::Dictionary(ap));
@@ -1308,7 +1432,8 @@ pub fn edit_add_image_stamp(
     // Add annotation ref to page's /Annots array
     let page_ref = editor.source_mut().get_page_ref(page)?;
     let page_obj = editor.source_mut().load_object(page_ref)?;
-    let mut page_dict = page_obj.as_dict()
+    let mut page_dict = page_obj
+        .as_dict()
         .ok_or_else(|| Error::InvalidPdf("page not a dict".into()))?
         .clone();
     // /Annots may be a direct array OR an indirect reference to one (ISO
@@ -1340,13 +1465,20 @@ pub fn edit_add_image_stamp(
 fn stamp_type_from_int(i: i32) -> crate::writer::StampType {
     use crate::writer::StampType;
     match i {
-        0 => StampType::Approved, 1 => StampType::Experimental,
-        2 => StampType::NotApproved, 3 => StampType::AsIs,
-        4 => StampType::Expired, 5 => StampType::NotForPublicRelease,
-        6 => StampType::Confidential, 7 => StampType::Final,
-        8 => StampType::Sold, 9 => StampType::Departmental,
-        10 => StampType::ForComment, 11 => StampType::TopSecret,
-        12 => StampType::Draft, 13 => StampType::ForPublicRelease,
+        0 => StampType::Approved,
+        1 => StampType::Experimental,
+        2 => StampType::NotApproved,
+        3 => StampType::AsIs,
+        4 => StampType::Expired,
+        5 => StampType::NotForPublicRelease,
+        6 => StampType::Confidential,
+        7 => StampType::Final,
+        8 => StampType::Sold,
+        9 => StampType::Departmental,
+        10 => StampType::ForComment,
+        11 => StampType::TopSecret,
+        12 => StampType::Draft,
+        13 => StampType::ForPublicRelease,
         _ => StampType::Draft,
     }
 }
@@ -1533,12 +1665,16 @@ pub fn replay_page_ops(builder: &mut DocumentBuilder, default_size: PageSize, op
     for op in ops {
         match op {
             PageOp::NewPage { width, height } => {
-                if let Some(p) = current_page.take() { p.done(); }
+                if let Some(p) = current_page.take() {
+                    p.done();
+                }
                 current_page = Some(builder.page(PageSize::Custom(width, height)));
-            }
+            },
             PageOp::Done => {
-                if let Some(p) = current_page.take() { p.done(); }
-            }
+                if let Some(p) = current_page.take() {
+                    p.done();
+                }
+            },
             other => {
                 let page = match current_page.take() {
                     Some(p) => p,
@@ -1552,62 +1688,146 @@ pub fn replay_page_ops(builder: &mut DocumentBuilder, default_size: PageSize, op
                     PageOp::Paragraph(ref text) => page.paragraph(text),
                     PageOp::Space(pts) => page.space(pts),
                     PageOp::HorizontalRule => page.horizontal_rule(),
-                    PageOp::Image { data, x, y, w, h, alt } => {
+                    PageOp::Image {
+                        data,
+                        x,
+                        y,
+                        w,
+                        h,
+                        alt,
+                    } => {
                         match crate::writer::ImageData::from_bytes(&data) {
-                            Ok(img) => page.image_with_alt(img, crate::geometry::Rect::new(x, y, x + w, y + h), &alt),
+                            Ok(img) => page.image_with_alt(
+                                img,
+                                crate::geometry::Rect::new(x, y, x + w, y + h),
+                                &alt,
+                            ),
                             Err(_) => page, // skip — image data unparseable
                         }
-                    }
+                    },
                     PageOp::Watermark(text) => page.watermark(&text),
-                    PageOp::TextField { name, x, y, w, h, default_value } => page.text_field(name, x, y, w, h, default_value),
-                    PageOp::Checkbox { name, x, y, w, h, checked } => page.checkbox(&name, x, y, w, h, checked),
-                    PageOp::ComboBox { name, x, y, w, h, options, selected } => page.combo_box(name, x, y, w, h, options, selected),
-                    PageOp::PushButton { name, x, y, w, h, caption } => page.push_button(&name, x, y, w, h, &caption),
-                    PageOp::SignatureField { name, x, y, w, h } => page.signature_field(&name, x, y, w, h),
-                    PageOp::RadioGroup { name, values, xs, ys, ws, hs, selected } => {
-                        let buttons: Vec<(String, f32, f32, f32, f32)> = values.into_iter()
-                            .zip(xs).zip(ys).zip(ws).zip(hs)
+                    PageOp::TextField {
+                        name,
+                        x,
+                        y,
+                        w,
+                        h,
+                        default_value,
+                    } => page.text_field(name, x, y, w, h, default_value),
+                    PageOp::Checkbox {
+                        name,
+                        x,
+                        y,
+                        w,
+                        h,
+                        checked,
+                    } => page.checkbox(&name, x, y, w, h, checked),
+                    PageOp::ComboBox {
+                        name,
+                        x,
+                        y,
+                        w,
+                        h,
+                        options,
+                        selected,
+                    } => page.combo_box(name, x, y, w, h, options, selected),
+                    PageOp::PushButton {
+                        name,
+                        x,
+                        y,
+                        w,
+                        h,
+                        caption,
+                    } => page.push_button(&name, x, y, w, h, &caption),
+                    PageOp::SignatureField { name, x, y, w, h } => {
+                        page.signature_field(&name, x, y, w, h)
+                    },
+                    PageOp::RadioGroup {
+                        name,
+                        values,
+                        xs,
+                        ys,
+                        ws,
+                        hs,
+                        selected,
+                    } => {
+                        let buttons: Vec<(String, f32, f32, f32, f32)> = values
+                            .into_iter()
+                            .zip(xs)
+                            .zip(ys)
+                            .zip(ws)
+                            .zip(hs)
                             .map(|((((v, x), y), w), h)| (v, x, y, w, h))
                             .collect();
                         page.radio_group(name, buttons, selected)
-                    }
+                    },
                     PageOp::FieldKeystroke(script) => page.field_keystroke(script),
                     PageOp::FieldFormat(script) => page.field_format(script),
                     PageOp::FieldValidate(script) => page.field_validate(script),
                     PageOp::FieldCalculate(script) => page.field_calculate(script),
                     PageOp::LinkUrl(url) => page.link_url(&url),
                     PageOp::LinkPage(target) => page.link_page(target),
-                    PageOp::Footnote { ref_mark, note_text } => page.footnote(&ref_mark, &note_text),
-                    PageOp::Columns { column_count, gap_pt, text } => page.columns(column_count, gap_pt, &text),
+                    PageOp::Footnote {
+                        ref_mark,
+                        note_text,
+                    } => page.footnote(&ref_mark, &note_text),
+                    PageOp::Columns {
+                        column_count,
+                        gap_pt,
+                        text,
+                    } => page.columns(column_count, gap_pt, &text),
                     PageOp::Newline => page.newline(),
                     PageOp::NewPageSameSize => page.new_page_same_size(),
                     PageOp::NewPage { .. } | PageOp::Done => unreachable!(),
                 });
-            }
+            },
         }
     }
-    if let Some(p) = current_page { p.done(); }
+    if let Some(p) = current_page {
+        p.done();
+    }
 }
 
 /// Create a new empty DocumentBuilder.
-pub fn builder_new() -> DocumentBuilder { DocumentBuilder::new() }
+pub fn builder_new() -> DocumentBuilder {
+    DocumentBuilder::new()
+}
 /// Set the builder's document title.
-pub fn builder_set_title(b: DocumentBuilder, title: &str) -> DocumentBuilder { b.title(title) }
+pub fn builder_set_title(b: DocumentBuilder, title: &str) -> DocumentBuilder {
+    b.title(title)
+}
 /// Set the builder's document author.
-pub fn builder_set_author(b: DocumentBuilder, author: &str) -> DocumentBuilder { b.author(author) }
+pub fn builder_set_author(b: DocumentBuilder, author: &str) -> DocumentBuilder {
+    b.author(author)
+}
 /// Set the builder's document subject.
-pub fn builder_set_subject(b: DocumentBuilder, subject: &str) -> DocumentBuilder { b.subject(subject) }
+pub fn builder_set_subject(b: DocumentBuilder, subject: &str) -> DocumentBuilder {
+    b.subject(subject)
+}
 /// Set the builder's document keywords.
-pub fn builder_set_keywords(b: DocumentBuilder, keywords: &str) -> DocumentBuilder { b.keywords(keywords) }
+pub fn builder_set_keywords(b: DocumentBuilder, keywords: &str) -> DocumentBuilder {
+    b.keywords(keywords)
+}
 /// Add a custom-sized page and return a fluent page builder.
-pub fn builder_add_page(b: &mut DocumentBuilder, width: f32, height: f32) -> FluentPageBuilder<'_> { b.page(PageSize::Custom(width, height)) }
+pub fn builder_add_page(b: &mut DocumentBuilder, width: f32, height: f32) -> FluentPageBuilder<'_> {
+    b.page(PageSize::Custom(width, height))
+}
 /// Add an A4-sized page and return a fluent page builder.
-pub fn builder_add_a4_page(b: &mut DocumentBuilder) -> FluentPageBuilder<'_> { b.page(PageSize::A4) }
+pub fn builder_add_a4_page(b: &mut DocumentBuilder) -> FluentPageBuilder<'_> {
+    b.page(PageSize::A4)
+}
 /// Add a Letter-sized page and return a fluent page builder.
-pub fn builder_add_letter_page(b: &mut DocumentBuilder) -> FluentPageBuilder<'_> { b.page(PageSize::Letter) }
+pub fn builder_add_letter_page(b: &mut DocumentBuilder) -> FluentPageBuilder<'_> {
+    b.page(PageSize::Letter)
+}
 /// Build the document and return the PDF bytes.
-pub fn builder_save(b: DocumentBuilder) -> Result<Vec<u8>> { b.build() }
+pub fn builder_save(b: DocumentBuilder) -> Result<Vec<u8>> {
+    b.build()
+}
 /// Build the document and write the PDF to a positioned writer.
-pub fn builder_save_to_writer(b: DocumentBuilder, writer: &mut impl crate::host::positioned_write::PositionedWrite) -> Result<()> {
+pub fn builder_save_to_writer(
+    b: DocumentBuilder,
+    writer: &mut impl crate::host::positioned_write::PositionedWrite,
+) -> Result<()> {
     b.build_to_writer(writer)
 }

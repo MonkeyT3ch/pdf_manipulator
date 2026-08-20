@@ -565,9 +565,7 @@ impl PdfDocument {
                         Object::Array(inner) if !inner.is_empty() => {
                             // Option can be [export_value, display_value]
                             inner.first().and_then(|first| match first {
-                                Object::String(s) => {
-                                    Some(crate::object::decode_pdf_text_string(s))
-                                },
+                                Object::String(s) => Some(crate::object::decode_pdf_text_string(s)),
                                 _ => None,
                             })
                         },

@@ -126,18 +126,21 @@ pub unsafe fn data_ptr(base: *mut u8, offset: usize) -> *mut u8 {
 
 #[inline]
 /// Atomically load the flags word from the buffer.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn load_flags(base: *const u8, flags_offset: usize) -> u32 {
     unsafe { flags_ref(base, flags_offset).load(Ordering::Acquire) }
 }
 
 #[inline]
 /// Atomically store the flags word into the buffer.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn store_flags(base: *mut u8, flags_offset: usize, value: u32) {
     unsafe { flags_ref(base, flags_offset).store(value, Ordering::Release) }
 }
 
 #[inline]
 /// Atomically OR the given bits into the flags word.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn set_flag_bits(base: *mut u8, flags_offset: usize, bits: u32) {
     unsafe { flags_ref(base, flags_offset).fetch_or(bits, Ordering::Release) };
 }
@@ -158,6 +161,7 @@ pub const RESPONSE_FLAGS: u32 = FLAG_READY | FLAG_ERROR | FLAG_ACK;
 /// request cycle, so a cancel can never be erased by a racing
 /// `clear`. A held channel that was collaterally flagged is revived
 /// explicitly by the host between jobs — never implicitly here.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn clear_response_flags(base: *mut u8, flags_offset: usize) {
     unsafe { flags_ref(base, flags_offset).fetch_and(!RESPONSE_FLAGS, Ordering::AcqRel) };
 }
@@ -371,8 +375,12 @@ mod tests {
             let guard = pair.mutex.lock().unwrap();
             let token = CancelToken::unconnected();
             let result = wait_for_flags(
-                pair, guard, buf.as_ptr(), flags_offset,
-                FLAG_READY | FLAG_ERROR, &token,
+                pair,
+                guard,
+                buf.as_ptr(),
+                flags_offset,
+                FLAG_READY | FLAG_ERROR,
+                &token,
             );
             assert!(result.is_ok());
             assert!(result.unwrap() & FLAG_READY != 0);
@@ -394,10 +402,8 @@ mod tests {
             let guard = pair.mutex.lock().unwrap();
             let lane = Arc::new(AtomicBool::new(true));
             let token = CancelToken::new(lane, Arc::new(AtomicBool::new(false)));
-            let result = wait_for_flags(
-                pair, guard, buf.as_ptr(), flags_offset,
-                FLAG_READY, &token,
-            );
+            let result =
+                wait_for_flags(pair, guard, buf.as_ptr(), flags_offset, FLAG_READY, &token);
             let err = result.unwrap_err();
             // Must NOT be Interrupted — std combinators retry that kind.
             assert_ne!(err.kind(), std::io::ErrorKind::Interrupted);
@@ -432,8 +438,12 @@ mod tests {
             let guard = pair.mutex.lock().unwrap();
             let token = CancelToken::unconnected();
             let result = wait_for_flags(
-                pair, guard, buf.as_ptr(), flags_offset,
-                FLAG_READY | FLAG_ERROR | FLAG_CANCELLED, &token,
+                pair,
+                guard,
+                buf.as_ptr(),
+                flags_offset,
+                FLAG_READY | FLAG_ERROR | FLAG_CANCELLED,
+                &token,
             );
             assert!(result.unwrap() & FLAG_CANCELLED != 0);
 

@@ -30,9 +30,7 @@
 
 // ── pdf_manipulator patch: StampType unused — for_stamp takes a label ──
 // ── end pdf_manipulator patch ──
-use crate::annotation_types::{
-    AnnotationColor, CaretSymbol, LineEndingStyle, TextAnnotationIcon,
-};
+use crate::annotation_types::{AnnotationColor, CaretSymbol, LineEndingStyle, TextAnnotationIcon};
 use crate::geometry::Rect;
 use crate::object::Object;
 use std::collections::HashMap;
@@ -76,10 +74,7 @@ impl AppearanceStreamBuilder {
         font.insert("Type".to_string(), Object::Name("Font".to_string()));
         font.insert("Subtype".to_string(), Object::Name("Type1".to_string()));
         font.insert("BaseFont".to_string(), Object::Name(base_font.to_string()));
-        font.insert(
-            "Encoding".to_string(),
-            Object::Name("WinAnsiEncoding".to_string()),
-        );
+        font.insert("Encoding".to_string(), Object::Name("WinAnsiEncoding".to_string()));
         let fonts = match self.resources.get_mut("Font") {
             Some(Object::Dictionary(d)) => d,
             _ => {
@@ -89,7 +84,7 @@ impl AppearanceStreamBuilder {
                     Some(Object::Dictionary(d)) => d,
                     _ => unreachable!("Font entry was just inserted as a dict"),
                 }
-            }
+            },
         };
         fonts.insert(res_name.to_string(), Object::Dictionary(font));
         self
@@ -1164,19 +1159,22 @@ mod tests {
     #[test]
     fn test_stamp_appearance() {
         let rect = Rect::new(0.0, 0.0, 150.0, 50.0);
-        let ap =
-            AppearanceStreamBuilder::for_stamp(rect, "APPROVED", AnnotationColor::red());
+        let ap = AppearanceStreamBuilder::for_stamp(rect, "APPROVED", AnnotationColor::red());
 
         let (dict, content) = ap.build();
         let content_str = String::from_utf8_lossy(&content);
 
         assert!(content_str.contains("1 0 0 RG")); // Red stroke
         assert!(content_str.contains("c")); // Curved corners
-        // The label renders as real text through an inline font resource.
+                                            // The label renders as real text through an inline font resource.
         assert!(content_str.contains("(APPROVED) Tj"));
         assert!(content_str.contains("/F0"));
         let res = dict.get("Resources").and_then(|r| r.as_dict()).unwrap();
-        assert!(res.get("Font").and_then(|f| f.as_dict()).unwrap().contains_key("F0"));
+        assert!(res
+            .get("Font")
+            .and_then(|f| f.as_dict())
+            .unwrap()
+            .contains_key("F0"));
     }
     // ── end pdf_manipulator patch ──
 
@@ -1656,8 +1654,7 @@ mod tests {
     fn test_stamp_small_rect() {
         // Small rect should limit corner radius
         let rect = Rect::new(0.0, 0.0, 12.0, 6.0);
-        let ap =
-            AppearanceStreamBuilder::for_stamp(rect, "APPROVED", AnnotationColor::green());
+        let ap = AppearanceStreamBuilder::for_stamp(rect, "APPROVED", AnnotationColor::green());
         let (_, content) = ap.build();
         assert!(!content.is_empty());
     }

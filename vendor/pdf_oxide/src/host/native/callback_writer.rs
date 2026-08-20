@@ -42,17 +42,18 @@ impl CallbackWriter {
     ///   with sync initialized via `sb::init_sync`.
     /// - `notify_fn` must be safe to call from any thread.
     /// - The buffer must outlive this writer.
-    pub unsafe fn new(
-        buf: *mut u8,
-        notify_fn: unsafe extern "C" fn(),
-        token: CancelToken,
-    ) -> Self {
-        Self { buf, notify_fn, token, position: 0, pending: 0 }
+    pub unsafe fn new(buf: *mut u8, notify_fn: unsafe extern "C" fn(), token: CancelToken) -> Self {
+        Self {
+            buf,
+            notify_fn,
+            token,
+            position: 0,
+            pending: 0,
+        }
     }
 
     fn is_cancelled(&self) -> bool {
-        self.token.is_cancelled()
-            || sb::has_flag(self.buf, wc::OFFSET_FLAGS, sb::FLAG_CANCELLED)
+        self.token.is_cancelled() || sb::has_flag(self.buf, wc::OFFSET_FLAGS, sb::FLAG_CANCELLED)
     }
 
     fn flush_pending(&mut self) -> io::Result<()> {
@@ -81,7 +82,9 @@ impl CallbackWriter {
             return Err(crate::host::native::cancel::cancelled());
         }
 
-        unsafe { (self.notify_fn)(); }
+        unsafe {
+            (self.notify_fn)();
+        }
 
         let flags = sb::wait_for_flags(
             pair,
@@ -99,7 +102,7 @@ impl CallbackWriter {
         }
 
         if flags & sb::FLAG_ERROR != 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "host write failed"));
+            return Err(io::Error::other("host write failed"));
         }
 
         Err(crate::host::native::cancel::cancelled())
@@ -175,7 +178,7 @@ mod tests {
             position: 42,
             pending: 0,
         };
-        assert_eq!(writer.seek(SeekFrom::Current(0)).unwrap(), 42);
+        assert_eq!(writer.stream_position().unwrap(), 42);
     }
 
     #[test]
@@ -195,19 +198,21 @@ mod tests {
     #[test]
     fn cancelled_write_returns_non_retryable_error() {
         let mut buf = vec![0u8; wc::TOTAL_SIZE];
-        unsafe { sb::init_sync(buf.as_mut_ptr(), wc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::init_sync(buf.as_mut_ptr(), wc::OFFSET_SYNC_PTR);
+        }
 
         let job = Arc::new(AtomicBool::new(true));
         let token = CancelToken::new(Arc::new(AtomicBool::new(false)), job);
-        let mut writer = unsafe {
-            CallbackWriter::new(buf.as_mut_ptr(), noop_notify, token)
-        };
+        let mut writer = unsafe { CallbackWriter::new(buf.as_mut_ptr(), noop_notify, token) };
         let err = writer.write(&[1, 2, 3]).unwrap_err();
         // Must NOT be Interrupted — std combinators retry that kind.
         assert_ne!(err.kind(), io::ErrorKind::Interrupted);
         assert!(err.to_string().contains("cancelled"));
 
-        unsafe { sb::destroy_sync(buf.as_mut_ptr(), wc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::destroy_sync(buf.as_mut_ptr(), wc::OFFSET_SYNC_PTR);
+        }
     }
 
     #[test]

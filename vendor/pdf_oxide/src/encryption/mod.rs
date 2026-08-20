@@ -591,11 +591,8 @@ impl EncryptDictBuilder {
                 revision,
             )?;
             // ── pdf_manipulator patch: /Perms + raw file key for R6 ──
-            let perms = algorithms::compute_perms(
-                self.permissions,
-                self.encrypt_metadata,
-                &file_key,
-            )?;
+            let perms =
+                algorithms::compute_perms(self.permissions, self.encrypt_metadata, &file_key)?;
             return Ok(EncryptDict {
                 filter: "Standard".to_string(),
                 sub_filter: None,

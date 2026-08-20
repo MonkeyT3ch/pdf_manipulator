@@ -12,9 +12,9 @@
 //! when the buffer is full or on flush/drop. O(1) memory — the buffer
 //! is fixed-size, never grows with PDF size.
 
+use crate::host::constants::WRITE_BUF_CAPACITY;
 use std::io::{self, Seek, SeekFrom, Write};
 use wasm_bindgen::prelude::*;
-use crate::host::constants::WRITE_BUF_CAPACITY;
 
 // Imported from the JS global scope (self.host_write_chunk in lane_worker.js).
 // Uses u32 for buf_ptr because wasm_bindgen doesn't support raw pointers.
@@ -47,7 +47,11 @@ impl JsCallbackWriter {
         if self.buffer.is_empty() {
             return Ok(());
         }
-        let result = host_write_chunk(self.sink_index, self.buffer.as_ptr() as u32, self.buffer.len() as u32);
+        let result = host_write_chunk(
+            self.sink_index,
+            self.buffer.as_ptr() as u32,
+            self.buffer.len() as u32,
+        );
         if result == crate::host::constants::HOST_IO_CANCELLED {
             // Deliberately NOT ErrorKind::Interrupted — std combinators
             // retry that kind, which would spin forever on a cancel.
@@ -72,7 +76,8 @@ impl Write for JsCallbackWriter {
         while written < buf.len() {
             let remaining = WRITE_BUF_CAPACITY - self.buffer.len();
             let to_copy = (buf.len() - written).min(remaining);
-            self.buffer.extend_from_slice(&buf[written..written + to_copy]);
+            self.buffer
+                .extend_from_slice(&buf[written..written + to_copy]);
             self.position += to_copy as u64;
             written += to_copy;
 

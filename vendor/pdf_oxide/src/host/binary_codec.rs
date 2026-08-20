@@ -78,7 +78,15 @@ impl<'a> Request<'a> {
     /// Get a string field by key.
     pub fn get_str(&self, key: &str) -> Option<&'a str> {
         self.fields.iter().find_map(|(k, v)| {
-            if *k == key { if let FieldValue::Str(s) = v { Some(*s) } else { None } } else { None }
+            if *k == key {
+                if let FieldValue::Str(s) = v {
+                    Some(*s)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
     }
 
@@ -91,7 +99,9 @@ impl<'a> Request<'a> {
                     FieldValue::I64(n) => Some(*n as i32),
                     _ => None,
                 }
-            } else { None }
+            } else {
+                None
+            }
         })
     }
 
@@ -104,7 +114,9 @@ impl<'a> Request<'a> {
                     FieldValue::I32(n) => Some(*n as i64),
                     _ => None,
                 }
-            } else { None }
+            } else {
+                None
+            }
         })
     }
 
@@ -119,42 +131,84 @@ impl<'a> Request<'a> {
                     FieldValue::I64(n) => Some(*n as f64),
                     _ => None,
                 }
-            } else { None }
+            } else {
+                None
+            }
         })
     }
 
     /// Get a bool field by key.
     pub fn get_bool(&self, key: &str) -> Option<bool> {
         self.fields.iter().find_map(|(k, v)| {
-            if *k == key { if let FieldValue::Bool(b) = v { Some(*b) } else { None } } else { None }
+            if *k == key {
+                if let FieldValue::Bool(b) = v {
+                    Some(*b)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
     }
 
     /// Get a byte-slice field by key.
     pub fn get_bytes(&self, key: &str) -> Option<&'a [u8]> {
         self.fields.iter().find_map(|(k, v)| {
-            if *k == key { if let FieldValue::Bytes(b) = v { Some(*b) } else { None } } else { None }
+            if *k == key {
+                if let FieldValue::Bytes(b) = v {
+                    Some(*b)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
     }
 
     /// Get an i32 list field by key.
     pub fn get_int_list(&self, key: &str) -> Option<&[i32]> {
         self.fields.iter().find_map(|(k, v)| {
-            if *k == key { if let FieldValue::IntList(l) = v { Some(l.as_slice()) } else { None } } else { None }
+            if *k == key {
+                if let FieldValue::IntList(l) = v {
+                    Some(l.as_slice())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
     }
 
     /// Get an f64 list field by key.
     pub fn get_f64_list(&self, key: &str) -> Option<&[f64]> {
         self.fields.iter().find_map(|(k, v)| {
-            if *k == key { if let FieldValue::F64List(l) = v { Some(l.as_slice()) } else { None } } else { None }
+            if *k == key {
+                if let FieldValue::F64List(l) = v {
+                    Some(l.as_slice())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
     }
 
     /// Get a string list field by key.
     pub fn get_string_list(&self, key: &str) -> Option<Vec<&'a str>> {
         self.fields.iter().find_map(|(k, v)| {
-            if *k == key { if let FieldValue::StringList(l) = v { Some(l.clone()) } else { None } } else { None }
+            if *k == key {
+                if let FieldValue::StringList(l) = v {
+                    Some(l.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
     }
 }
@@ -170,23 +224,27 @@ fn read_value<'a>(r: &mut Reader<'a>) -> Result<FieldValue<'a>, &'static str> {
         5 => {
             let len = r.u32()? as usize;
             Ok(FieldValue::Str(r.utf8(len)?))
-        }
+        },
         6 => {
             let len = r.u32()? as usize;
             Ok(FieldValue::Bytes(r.slice(len)?))
-        }
+        },
         7 => {
             let count = r.u32()? as usize;
             let mut list = Vec::with_capacity(count);
-            for _ in 0..count { list.push(r.i32()?); }
+            for _ in 0..count {
+                list.push(r.i32()?);
+            }
             Ok(FieldValue::IntList(list))
-        }
+        },
         8 => {
             let count = r.u32()? as usize;
             let mut list = Vec::with_capacity(count);
-            for _ in 0..count { list.push(r.f64()?); }
+            for _ in 0..count {
+                list.push(r.f64()?);
+            }
             Ok(FieldValue::F64List(list))
-        }
+        },
         9 => {
             let count = r.u32()? as usize;
             let mut list = Vec::with_capacity(count);
@@ -195,7 +253,7 @@ fn read_value<'a>(r: &mut Reader<'a>) -> Result<FieldValue<'a>, &'static str> {
                 list.push(r.utf8(slen)?);
             }
             Ok(FieldValue::StringList(list))
-        }
+        },
         10 => {
             let count = r.u32()? as usize;
             let mut list = Vec::with_capacity(count);
@@ -214,7 +272,7 @@ fn read_value<'a>(r: &mut Reader<'a>) -> Result<FieldValue<'a>, &'static str> {
                 list.push(fields);
             }
             Ok(FieldValue::MapList(list))
-        }
+        },
         _ => Ok(FieldValue::Null),
     }
 }
@@ -233,7 +291,8 @@ impl ResponseWriter {
     pub fn ok() -> Self {
         let mut buf = Vec::with_capacity(256);
         buf.push(1); // status = ok
-        buf.push(0); buf.push(0); // field count placeholder (patched in finish)
+        buf.push(0);
+        buf.push(0); // field count placeholder (patched in finish)
         ResponseWriter { buf }
     }
 
@@ -291,7 +350,8 @@ impl ResponseWriter {
         self.write_key(key);
         self.buf.push(5);
         let bytes = val.as_bytes();
-        self.buf.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+        self.buf
+            .extend_from_slice(&(bytes.len() as u32).to_le_bytes());
         self.buf.extend_from_slice(bytes);
         self.inc_count();
     }
@@ -300,7 +360,8 @@ impl ResponseWriter {
     pub fn put_bytes(&mut self, key: &str, val: &[u8]) {
         self.write_key(key);
         self.buf.push(6);
-        self.buf.extend_from_slice(&(val.len() as u32).to_le_bytes());
+        self.buf
+            .extend_from_slice(&(val.len() as u32).to_le_bytes());
         self.buf.extend_from_slice(val);
         self.inc_count();
     }
@@ -309,7 +370,8 @@ impl ResponseWriter {
     pub fn put_int_list(&mut self, key: &str, val: &[i32]) {
         self.write_key(key);
         self.buf.push(7);
-        self.buf.extend_from_slice(&(val.len() as u32).to_le_bytes());
+        self.buf
+            .extend_from_slice(&(val.len() as u32).to_le_bytes());
         for &n in val {
             self.buf.extend_from_slice(&n.to_le_bytes());
         }
@@ -318,7 +380,8 @@ impl ResponseWriter {
 
     /// Write a list of map (key-value) entries.
     pub fn put_map_list<F>(&mut self, key: &str, count: usize, mut write_item: F)
-    where F: FnMut(usize, &mut ResponseWriter)
+    where
+        F: FnMut(usize, &mut ResponseWriter),
     {
         self.write_key(key);
         self.buf.push(10);
@@ -327,7 +390,8 @@ impl ResponseWriter {
             let mut item = ResponseWriter::ok();
             write_item(i, &mut item);
             let item_bytes = item.finish_inner();
-            self.buf.extend_from_slice(&(item_bytes.len() as u32).to_le_bytes());
+            self.buf
+                .extend_from_slice(&(item_bytes.len() as u32).to_le_bytes());
             self.buf.extend_from_slice(&item_bytes);
         }
         self.inc_count();
@@ -377,21 +441,27 @@ impl<'a> Reader<'a> {
     }
 
     fn u8(&mut self) -> Result<u8, &'static str> {
-        if self.remaining() < 1 { return Err("unexpected end of data"); }
+        if self.remaining() < 1 {
+            return Err("unexpected end of data");
+        }
         let v = self.data[self.pos];
         self.pos += 1;
         Ok(v)
     }
 
     fn u16(&mut self) -> Result<u16, &'static str> {
-        if self.remaining() < 2 { return Err("unexpected end of data"); }
+        if self.remaining() < 2 {
+            return Err("unexpected end of data");
+        }
         let v = u16::from_le_bytes([self.data[self.pos], self.data[self.pos + 1]]);
         self.pos += 2;
         Ok(v)
     }
 
     fn u32(&mut self) -> Result<u32, &'static str> {
-        if self.remaining() < 4 { return Err("unexpected end of data"); }
+        if self.remaining() < 4 {
+            return Err("unexpected end of data");
+        }
         let bytes: [u8; 4] = self.data[self.pos..self.pos + 4].try_into().unwrap();
         let v = u32::from_le_bytes(bytes);
         self.pos += 4;
@@ -399,7 +469,9 @@ impl<'a> Reader<'a> {
     }
 
     fn i32(&mut self) -> Result<i32, &'static str> {
-        if self.remaining() < 4 { return Err("unexpected end of data"); }
+        if self.remaining() < 4 {
+            return Err("unexpected end of data");
+        }
         let bytes: [u8; 4] = self.data[self.pos..self.pos + 4].try_into().unwrap();
         let v = i32::from_le_bytes(bytes);
         self.pos += 4;
@@ -407,7 +479,9 @@ impl<'a> Reader<'a> {
     }
 
     fn i64(&mut self) -> Result<i64, &'static str> {
-        if self.remaining() < 8 { return Err("unexpected end of data"); }
+        if self.remaining() < 8 {
+            return Err("unexpected end of data");
+        }
         let bytes: [u8; 8] = self.data[self.pos..self.pos + 8].try_into().unwrap();
         let v = i64::from_le_bytes(bytes);
         self.pos += 8;
@@ -415,7 +489,9 @@ impl<'a> Reader<'a> {
     }
 
     fn f64(&mut self) -> Result<f64, &'static str> {
-        if self.remaining() < 8 { return Err("unexpected end of data"); }
+        if self.remaining() < 8 {
+            return Err("unexpected end of data");
+        }
         let bytes: [u8; 8] = self.data[self.pos..self.pos + 8].try_into().unwrap();
         let v = f64::from_le_bytes(bytes);
         self.pos += 8;
@@ -423,7 +499,9 @@ impl<'a> Reader<'a> {
     }
 
     fn slice(&mut self, len: usize) -> Result<&'a [u8], &'static str> {
-        if self.remaining() < len { return Err("unexpected end of data"); }
+        if self.remaining() < len {
+            return Err("unexpected end of data");
+        }
         let s = &self.data[self.pos..self.pos + len];
         self.pos += len;
         Ok(s)
@@ -470,16 +548,22 @@ mod tests {
         data.extend_from_slice(&3u16.to_le_bytes()); // 3 fields
 
         // field 1: "page" = i32(5)
-        data.push(4); data.extend_from_slice(b"page");
-        data.push(1); data.extend_from_slice(&5i32.to_le_bytes());
+        data.push(4);
+        data.extend_from_slice(b"page");
+        data.push(1);
+        data.extend_from_slice(&5i32.to_le_bytes());
 
         // field 2: "scale" = f64(1.5)
-        data.push(5); data.extend_from_slice(b"scale");
-        data.push(3); data.extend_from_slice(&1.5f64.to_le_bytes());
+        data.push(5);
+        data.extend_from_slice(b"scale");
+        data.push(3);
+        data.extend_from_slice(&1.5f64.to_le_bytes());
 
         // field 3: "compress" = bool(true)
-        data.push(8); data.extend_from_slice(b"compress");
-        data.push(4); data.push(1);
+        data.push(8);
+        data.extend_from_slice(b"compress");
+        data.push(4);
+        data.push(1);
 
         let req = Request::parse(&data).unwrap();
         assert_eq!(req.op(), "test");
@@ -516,7 +600,8 @@ mod tests {
         data.push(4);
         data.extend_from_slice(b"test");
         data.extend_from_slice(&1u16.to_le_bytes());
-        data.push(4); data.extend_from_slice(b"data");
+        data.push(4);
+        data.extend_from_slice(b"data");
         data.push(6); // bytes
         let payload = [0xDE, 0xAD, 0xBE, 0xEF];
         data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
@@ -532,7 +617,8 @@ mod tests {
         data.push(4);
         data.extend_from_slice(b"test");
         data.extend_from_slice(&1u16.to_le_bytes());
-        data.push(5); data.extend_from_slice(b"pages");
+        data.push(5);
+        data.extend_from_slice(b"pages");
         data.push(7); // int_list
         data.extend_from_slice(&3u32.to_le_bytes());
         data.extend_from_slice(&0i32.to_le_bytes());

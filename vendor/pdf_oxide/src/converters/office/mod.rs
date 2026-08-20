@@ -173,13 +173,20 @@ impl OfficeConverter {
     // ── pdf_manipulator patch: streaming DOCX→PDF (O(1) input via reader) ──
 
     /// Convert DOCX from a reader to PDF, streaming output to `writer`.
-    pub fn convert_docx_reader_to_writer<R: std::io::Read + std::io::Seek + Send + 'static, W: std::io::Write>(
-        &self, reader: R, output: &mut W,
+    pub fn convert_docx_reader_to_writer<
+        R: std::io::Read + std::io::Seek + Send + 'static,
+        W: std::io::Write,
+    >(
+        &self,
+        reader: R,
+        output: &mut W,
     ) -> Result<()> {
         let doc = Document::from_reader(reader, DocumentFormat::Docx)
             .map_err(|e| Error::InvalidOperation(format!("DOCX parse: {e}")))?;
         let mut extra_fonts: Vec<(String, Vec<u8>)> = doc
-            .as_docx().map(|d| d.embedded_fonts.clone()).unwrap_or_default();
+            .as_docx()
+            .map(|d| d.embedded_fonts.clone())
+            .unwrap_or_default();
         let ir = doc.to_ir();
         let _ = maybe_load_unicode_fallback(&ir, &mut extra_fonts);
         let _ = maybe_load_cjk_fallback(&ir, &mut extra_fonts);
@@ -214,13 +221,20 @@ impl OfficeConverter {
     // ── pdf_manipulator patch: streaming XLSX→PDF (O(1) input via reader) ──
 
     /// Convert XLSX from a reader to PDF, streaming output to `writer`.
-    pub fn convert_xlsx_reader_to_writer<R: std::io::Read + std::io::Seek + Send + 'static, W: std::io::Write>(
-        &self, reader: R, output: &mut W,
+    pub fn convert_xlsx_reader_to_writer<
+        R: std::io::Read + std::io::Seek + Send + 'static,
+        W: std::io::Write,
+    >(
+        &self,
+        reader: R,
+        output: &mut W,
     ) -> Result<()> {
         let doc = Document::from_reader(reader, DocumentFormat::Xlsx)
             .map_err(|e| Error::InvalidOperation(format!("XLSX parse: {e}")))?;
         let mut extra_fonts: Vec<(String, Vec<u8>)> = doc
-            .as_xlsx().map(|d| d.embedded_fonts.clone()).unwrap_or_default();
+            .as_xlsx()
+            .map(|d| d.embedded_fonts.clone())
+            .unwrap_or_default();
         let ir = doc.to_ir();
         let _ = maybe_load_unicode_fallback(&ir, &mut extra_fonts);
         let _ = maybe_load_cjk_fallback(&ir, &mut extra_fonts);
@@ -253,13 +267,20 @@ impl OfficeConverter {
     // ── pdf_manipulator patch: streaming PPTX→PDF (O(1) input via reader) ──
 
     /// Convert PPTX from a reader to PDF, streaming output to `writer`.
-    pub fn convert_pptx_reader_to_writer<R: std::io::Read + std::io::Seek + Send + 'static, W: std::io::Write>(
-        &self, reader: R, output: &mut W,
+    pub fn convert_pptx_reader_to_writer<
+        R: std::io::Read + std::io::Seek + Send + 'static,
+        W: std::io::Write,
+    >(
+        &self,
+        reader: R,
+        output: &mut W,
     ) -> Result<()> {
         let doc = Document::from_reader(reader, DocumentFormat::Pptx)
             .map_err(|e| Error::InvalidOperation(format!("PPTX parse: {e}")))?;
         let mut extra_fonts: Vec<(String, Vec<u8>)> = doc
-            .as_pptx().map(|d| d.embedded_fonts.clone()).unwrap_or_default();
+            .as_pptx()
+            .map(|d| d.embedded_fonts.clone())
+            .unwrap_or_default();
         let ir = doc.to_ir();
         let _ = maybe_load_unicode_fallback(&ir, &mut extra_fonts);
         let _ = maybe_load_cjk_fallback(&ir, &mut extra_fonts);
@@ -335,12 +356,16 @@ fn has_positional_layout(ir: &DocumentIR) -> bool {
 
 // ── pdf_manipulator patch: streaming positional render + core refactor ──
 pub(crate) fn render_positional_ir_writer<W: std::io::Write>(
-    ir: &DocumentIR, config: &OfficeConfig, extra_fonts: &[(String, Vec<u8>)], output: &mut W,
+    ir: &DocumentIR,
+    config: &OfficeConfig,
+    extra_fonts: &[(String, Vec<u8>)],
+    output: &mut W,
 ) -> Result<()> {
     use crate::host::positioned_write::CountingWriter;
     render_positional_ir_core(ir, config, extra_fonts, |builder| {
         let mut writer = CountingWriter::new(output);
-        builder.build_to_writer(&mut writer)
+        builder
+            .build_to_writer(&mut writer)
             .map_err(|e| Error::InvalidOperation(format!("positional PDF build: {e}")))
     })
 }
@@ -684,18 +709,28 @@ fn ir_to_pdf_core<R>(
         }
     }
 
-    if let Some(ref t) = ir.metadata.title { doc = doc.title(t); }
-    if let Some(ref a) = ir.metadata.author { doc = doc.author(a); }
-    if let Some(ref s) = ir.metadata.subject { doc = doc.subject(s); }
+    if let Some(ref t) = ir.metadata.title {
+        doc = doc.title(t);
+    }
+    if let Some(ref a) = ir.metadata.author {
+        doc = doc.author(a);
+    }
+    if let Some(ref s) = ir.metadata.subject {
+        doc = doc.subject(s);
+    }
 
     let unicode_fallback =
         if registered.contains(crate::fonts::unicode_fallback::UNICODE_FALLBACK_NAME) {
             Some(crate::fonts::unicode_fallback::UNICODE_FALLBACK_NAME.to_string())
-        } else { None };
+        } else {
+            None
+        };
     let cjk_fallback =
         if registered.contains(crate::fonts::unicode_fallback::UNICODE_FALLBACK_CJK_NAME) {
             Some(crate::fonts::unicode_fallback::UNICODE_FALLBACK_CJK_NAME.to_string())
-        } else { None };
+        } else {
+            None
+        };
 
     with_registered_fonts_full(registered, unicode_fallback, cjk_fallback, || {
         let section_page_size = |section: &Section| -> PageSize {
@@ -706,11 +741,18 @@ fn ir_to_pdf_core<R>(
                     return PageSize::Custom(w_pt, h_pt);
                 }
             }
-            if section_needs_landscape(section, config) { landscape(config.page_size) }
-            else { config.page_size }
+            if section_needs_landscape(section, config) {
+                landscape(config.page_size)
+            } else {
+                config.page_size
+            }
         };
 
-        let first_size = ir.sections.first().map(section_page_size).unwrap_or(config.page_size);
+        let first_size = ir
+            .sections
+            .first()
+            .map(section_page_size)
+            .unwrap_or(config.page_size);
         let mut page = doc.page(first_size);
         let mut cur_size = first_size;
 
@@ -725,20 +767,36 @@ fn ir_to_pdf_core<R>(
             }
             let col_count = section.columns.as_ref().map(|c| c.count).unwrap_or(1);
             if col_count >= 2 {
-                let (pw, ph) = match cur_size { PageSize::Custom(w, h) => (w, h), o => o.dimensions() };
+                let (pw, ph) = match cur_size {
+                    PageSize::Custom(w, h) => (w, h),
+                    o => o.dimensions(),
+                };
                 page = render_section_columned(page, section, col_count, pw, ph, config)?;
             } else {
-                let (_, ph) = match cur_size { PageSize::Custom(w, h) => (w, h), o => o.dimensions() };
+                let (_, ph) = match cur_size {
+                    PageSize::Custom(w, h) => (w, h),
+                    o => o.dimensions(),
+                };
                 let top_floor = top_floating_image_floor(&section.elements, ph);
                 let mut pinned = false;
                 for element in &section.elements {
                     if let Some(fy) = top_floor {
-                        if !pinned && matches!(element,
-                            Element::Paragraph(_) | Element::Heading(_) | Element::List(_)
-                            | Element::Table(_) | Element::CodeBlock(_)) {
+                        if !pinned
+                            && matches!(
+                                element,
+                                Element::Paragraph(_)
+                                    | Element::Heading(_)
+                                    | Element::List(_)
+                                    | Element::Table(_)
+                                    | Element::CodeBlock(_)
+                            )
+                        {
                             let cy = page.cursor_y();
                             let ny = fy - 6.0;
-                            if ny < cy && ny > 0.0 { let cx = page.cursor_x(); page = page.at(cx, ny); }
+                            if ny < cy && ny > 0.0 {
+                                let cx = page.cursor_x();
+                                page = page.at(cx, ny);
+                            }
                             pinned = true;
                         }
                     }
@@ -752,15 +810,21 @@ fn ir_to_pdf_core<R>(
 }
 
 fn ir_to_pdf_bytes(
-    ir: &DocumentIR, config: &OfficeConfig, extra_fonts: &[(String, Vec<u8>)],
+    ir: &DocumentIR,
+    config: &OfficeConfig,
+    extra_fonts: &[(String, Vec<u8>)],
 ) -> Result<Vec<u8>> {
     ir_to_pdf_core(ir, config, extra_fonts, |doc| {
-        doc.build().map_err(|e| Error::InvalidOperation(format!("PDF build: {e}")))
+        doc.build()
+            .map_err(|e| Error::InvalidOperation(format!("PDF build: {e}")))
     })
 }
 
 pub(crate) fn ir_to_pdf_writer<W: std::io::Write>(
-    ir: &DocumentIR, config: &OfficeConfig, extra_fonts: &[(String, Vec<u8>)], output: &mut W,
+    ir: &DocumentIR,
+    config: &OfficeConfig,
+    extra_fonts: &[(String, Vec<u8>)],
+    output: &mut W,
 ) -> Result<()> {
     use crate::host::positioned_write::CountingWriter;
     ir_to_pdf_core(ir, config, extra_fonts, |doc| {
@@ -2112,12 +2176,16 @@ fn pptx_has_positional(ir: &DocumentIR) -> bool {
 
 // ── pdf_manipulator patch: streaming PPTX positional render ──
 pub(crate) fn render_pptx_positional_writer<W: std::io::Write>(
-    ir: &DocumentIR, config: &OfficeConfig, extra_fonts: &[(String, Vec<u8>)], output: &mut W,
+    ir: &DocumentIR,
+    config: &OfficeConfig,
+    extra_fonts: &[(String, Vec<u8>)],
+    output: &mut W,
 ) -> Result<()> {
     use crate::host::positioned_write::CountingWriter;
     render_pptx_positional_core(ir, config, extra_fonts, |builder| {
         let mut writer = CountingWriter::new(output);
-        builder.build_to_writer(&mut writer)
+        builder
+            .build_to_writer(&mut writer)
             .map_err(|e| Error::InvalidOperation(format!("PPTX positional PDF build: {e}")))
     })
 }
@@ -2176,11 +2244,8 @@ fn render_pptx_positional_core<R>(
         } else {
             None
         };
-    let result = with_registered_fonts_full(
-        registered,
-        unicode_fallback,
-        cjk_fallback,
-        || -> Result<R> {
+    let result =
+        with_registered_fonts_full(registered, unicode_fallback, cjk_fallback, || -> Result<R> {
             for section in &ir.sections {
                 let (page_w_pt, page_h_pt) = section
                     .page_setup
@@ -2261,8 +2326,7 @@ fn render_pptx_positional_core<R>(
             }
 
             finalize(builder)
-        },
-    );
+        });
     result
 }
 // ── end pdf_manipulator patch ──

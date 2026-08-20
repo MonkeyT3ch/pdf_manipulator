@@ -47,10 +47,10 @@ pub enum ReadingOrder {
     ColumnAware,
 }
 
-/// In-memory reader used by `open()` and `from_bytes()`. Wrapping in an enum
-/// is kept (rather than using `BufReader<Cursor<Vec<u8>>>` directly) so a
-/// future file-backed variant can be re-introduced without touching call
-/// sites.
+// In-memory reader used by `open()` and `from_bytes()`. Wrapping in an enum
+// is kept (rather than using `BufReader<Cursor<Vec<u8>>>` directly) so a
+// future file-backed variant can be re-introduced without touching call
+// sites.
 // ── pdf_manipulator patch: External reader variant for O(1)-memory I/O ──
 // The External variant enables on-demand random-access reading via a
 // callback-backed Read+Seek (condvar on native, SAB/Asyncify on web).
@@ -1226,7 +1226,7 @@ impl PdfDocument {
         // Some PDFs store /O, /U, /V, /R, /P as indirect references (e.g., `7 0 R`).
         let encrypt_obj = if let Some(dict) = encrypt_obj.as_dict() {
             let mut resolved_dict = dict.clone();
-            for (_key, value) in resolved_dict.iter_mut() {
+            for value in resolved_dict.values_mut() {
                 if let Object::Reference(obj_ref) = value {
                     match self.load_object(*obj_ref) {
                         Ok(resolved) => *value = resolved,
@@ -1473,11 +1473,14 @@ impl PdfDocument {
         let dict = encrypt.as_dict()?;
         let v = dict.get("V")?.as_integer()? as i32;
         let r = dict.get("R").and_then(|r| r.as_integer()).unwrap_or(0) as i32;
-        let length = dict.get("Length").and_then(|l| l.as_integer()).unwrap_or(40) as i32;
+        let length = dict
+            .get("Length")
+            .and_then(|l| l.as_integer())
+            .unwrap_or(40) as i32;
         let algo = match (v, r, length) {
-            (1, _, _) => 1,          // RC4 40-bit
-            (2, _, 128) => 2,        // RC4 128-bit
-            (4, 4, _) => 3,          // AES-128
+            (1, _, _) => 1,             // RC4 40-bit
+            (2, _, 128) => 2,           // RC4 128-bit
+            (4, 4, _) => 3,             // AES-128
             (5, 5, _) | (5, 6, _) => 4, // AES-256
             _ => 0,
         };
@@ -1907,7 +1910,7 @@ impl PdfDocument {
                 Object::Array(arr) => arr.iter().for_each(|o| push_refs(o, out)),
                 Object::Dictionary(d) => d.values().for_each(|o| push_refs(o, out)),
                 Object::Stream { dict, .. } => dict.values().for_each(|o| push_refs(o, out)),
-                _ => {}
+                _ => {},
             }
         }
 
@@ -3110,7 +3113,7 @@ impl PdfDocument {
                 }
             },
             Object::Dictionary(dict) => {
-                for (_, value) in dict.iter_mut() {
+                for value in dict.values_mut() {
                     Self::decrypt_strings_in_object(handler, value, obj_num, gen_num);
                 }
             },
@@ -3118,7 +3121,7 @@ impl PdfDocument {
                 // Stream *data* is decrypted separately in
                 // `decode_stream_with_encryption`. Its dict may still
                 // contain encrypted strings (e.g., /Metadata).
-                for (_, value) in dict.iter_mut() {
+                for value in dict.values_mut() {
                     Self::decrypt_strings_in_object(handler, value, obj_num, gen_num);
                 }
             },
@@ -9171,7 +9174,8 @@ impl PdfDocument {
         let mut extractor = TextExtractor::new();
 
         // Load fonts from the AP/N stream's own /Resources
-        if let Some(resources) = n_dict.get("Resources") {
+        {
+            let resources = n_dict.get("Resources")?;
             let res_obj = if let Some(r) = resources.as_reference() {
                 self.load_object(r)
                     .ok()
@@ -9182,10 +9186,6 @@ impl PdfDocument {
             extractor.set_resources(res_obj.clone());
             extractor.set_document(self);
             let _ = self.load_fonts(&res_obj, &mut extractor);
-        } else {
-            // No resources on the AP stream — try the annotation's /DR or parent page resources
-            // For now, skip if no resources (can't decode fonts)
-            return None;
         }
 
         // Extract text spans from the AP stream
@@ -20433,8 +20433,11 @@ impl PdfDocument {
     pub fn to_docx_writer_flow<W: std::io::Write>(&self, writer: &mut W) -> Result<()> {
         let ir = self.pdf_to_office_ir(office_oxide::format::DocumentFormat::Docx)?;
         let mut w = office_oxide::create::ir_to_docx(&ir);
-        self.embed_pdf_fonts_into(|name, data| { w.embed_font(name, data); });
-        w.write_to(writer).map_err(|e| crate::error::Error::InvalidOperation(format!("DOCX export: {e}")))
+        self.embed_pdf_fonts_into(|name, data| {
+            w.embed_font(name, data);
+        });
+        w.write_to(writer)
+            .map_err(|e| crate::error::Error::InvalidOperation(format!("DOCX export: {e}")))
     }
 
     /// Forward every embedded font program from the source PDF (if
@@ -20565,8 +20568,11 @@ impl PdfDocument {
     pub fn to_pptx_writer_flow<W: std::io::Write>(&self, writer: &mut W) -> Result<()> {
         let ir = self.pdf_to_office_ir(office_oxide::format::DocumentFormat::Pptx)?;
         let mut w = office_oxide::create::ir_to_pptx(&ir);
-        self.embed_pdf_fonts_into(|name, data| { w.embed_font(name, data); });
-        w.write_to(writer).map_err(|e| crate::error::Error::InvalidOperation(format!("PPTX export: {e}")))
+        self.embed_pdf_fonts_into(|name, data| {
+            w.embed_font(name, data);
+        });
+        w.write_to(writer)
+            .map_err(|e| crate::error::Error::InvalidOperation(format!("PPTX export: {e}")))
     }
 
     /// Convert the entire document to an XLSX file on disk.
@@ -20616,7 +20622,8 @@ impl PdfDocument {
     pub fn to_xlsx_writer_flow<W: std::io::Write>(&self, writer: &mut W) -> Result<()> {
         let ir = self.pdf_to_office_ir(office_oxide::format::DocumentFormat::Xlsx)?;
         let w = office_oxide::create::ir_to_xlsx(&ir);
-        w.write_to(writer).map_err(|e| crate::error::Error::InvalidOperation(format!("XLSX export: {e}")))
+        w.write_to(writer)
+            .map_err(|e| crate::error::Error::InvalidOperation(format!("XLSX export: {e}")))
     }
     // ── end pdf_manipulator patch ──
 
@@ -21876,10 +21883,9 @@ impl PdfDocument {
                 for (i, val) in array.iter().take(6).enumerate() {
                     let num = if let Some(f) = val.as_real() {
                         f as f32
-                    } else if let Some(i_val) = val.as_integer() {
-                        i_val as f32
                     } else {
-                        return None;
+                        let i_val = val.as_integer()?;
+                        i_val as f32
                     };
                     values[i] = num;
                 }

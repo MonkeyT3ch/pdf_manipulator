@@ -29,8 +29,8 @@
 //! lane thread will never invoke a Dart notify callback again, so the
 //! caller may close NativeCallables immediately.
 
-use crate::host::bridge_api::{handle_request, BoxedReader, BoxedWriter};
 use crate::host::binary_codec::ResponseWriter;
+use crate::host::bridge_api::{handle_request, BoxedReader, BoxedWriter};
 use crate::host::lane_state::LaneState;
 use crate::host::native::callback_reader::CallbackReader;
 use crate::host::native::callback_writer::CallbackWriter;
@@ -115,7 +115,9 @@ pub struct ChannelRegistry {
 impl ChannelRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        Self { entries: Mutex::new(HashMap::new()) }
+        Self {
+            entries: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Register a job's channels AND adopt every held channel on
@@ -282,14 +284,9 @@ fn run_job(state: &mut LaneState, controller: &LaneController, job: Job) {
     let result = catch_unwind(AssertUnwindSafe(|| {
         let mut sources = Vec::with_capacity(job.sources.len());
         for s in &job.sources {
-            if s.buf != 0 && s.notify.is_some() && s.length > 0 {
+            if let (true, Some(notify)) = (s.buf != 0 && s.length > 0, s.notify) {
                 let reader = unsafe {
-                    CallbackReader::new(
-                        s.buf as *mut u8,
-                        s.notify.unwrap(),
-                        s.length as u64,
-                        token.clone(),
-                    )
+                    CallbackReader::new(s.buf as *mut u8, notify, s.length as u64, token.clone())
                 };
                 sources.push(BoxedReader(Box::new(reader)));
             }
@@ -297,10 +294,9 @@ fn run_job(state: &mut LaneState, controller: &LaneController, job: Job) {
 
         let mut sinks = Vec::with_capacity(job.sinks.len());
         for s in &job.sinks {
-            if s.buf != 0 && s.notify.is_some() {
-                let writer = unsafe {
-                    CallbackWriter::new(s.buf as *mut u8, s.notify.unwrap(), token.clone())
-                };
+            if let (true, Some(notify)) = (s.buf != 0, s.notify) {
+                let writer =
+                    unsafe { CallbackWriter::new(s.buf as *mut u8, notify, token.clone()) };
                 sinks.push(BoxedWriter(Box::new(writer)));
             }
         }
@@ -318,8 +314,8 @@ fn run_job(state: &mut LaneState, controller: &LaneController, job: Job) {
     // I/O error — but the caller must see the typed cancelled status,
     // identical to a pre-dequeue cancel. The flags are set-once, so
     // this check cannot misfire on a job that finished normally.
-    let was_cancelled = controller.cancel.load(Ordering::SeqCst)
-        || job.cancel.load(Ordering::SeqCst);
+    let was_cancelled =
+        controller.cancel.load(Ordering::SeqCst) || job.cancel.load(Ordering::SeqCst);
 
     let bytes = if was_cancelled {
         ResponseWriter::cancelled()

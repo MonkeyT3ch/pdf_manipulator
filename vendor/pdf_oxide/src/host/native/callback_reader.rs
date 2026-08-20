@@ -57,12 +57,17 @@ impl CallbackReader {
         length: u64,
         token: CancelToken,
     ) -> Self {
-        Self { buf, notify_fn, token, position: 0, length }
+        Self {
+            buf,
+            notify_fn,
+            token,
+            position: 0,
+            length,
+        }
     }
 
     fn is_cancelled(&self) -> bool {
-        self.token.is_cancelled()
-            || sb::has_flag(self.buf, rc::OFFSET_FLAGS, sb::FLAG_CANCELLED)
+        self.token.is_cancelled() || sb::has_flag(self.buf, rc::OFFSET_FLAGS, sb::FLAG_CANCELLED)
     }
 }
 
@@ -76,9 +81,7 @@ impl Read for CallbackReader {
         }
 
         let remaining = self.length - self.position;
-        let to_read = out.len()
-            .min(remaining as usize)
-            .min(rc::DATA_CAPACITY);
+        let to_read = out.len().min(remaining as usize).min(rc::DATA_CAPACITY);
 
         let pair = unsafe { sb::get_sync(self.buf, rc::OFFSET_SYNC_PTR) };
         let guard = pair.mutex.lock().unwrap();
@@ -96,7 +99,9 @@ impl Read for CallbackReader {
             return Err(crate::host::native::cancel::cancelled());
         }
 
-        unsafe { (self.notify_fn)(); }
+        unsafe {
+            (self.notify_fn)();
+        }
 
         let flags = sb::wait_for_flags(
             pair,
@@ -118,7 +123,7 @@ impl Read for CallbackReader {
         }
 
         if flags & sb::FLAG_ERROR != 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "host read failed"));
+            return Err(io::Error::other("host read failed"));
         }
 
         Err(crate::host::native::cancel::cancelled())
@@ -133,10 +138,7 @@ impl Seek for CallbackReader {
             SeekFrom::Current(offset) => self.position as i64 + offset,
         };
         if new_pos < 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "seek to negative position",
-            ));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "seek to negative position"));
         }
         self.position = new_pos as u64;
         Ok(self.position)
@@ -154,7 +156,9 @@ mod tests {
     #[test]
     fn seek_positions() {
         let mut buf = vec![0u8; rc::TOTAL_SIZE];
-        unsafe { sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
 
         let mut reader = unsafe {
             CallbackReader::new(buf.as_mut_ptr(), noop_notify, 1000, CancelToken::unconnected())
@@ -165,13 +169,17 @@ mod tests {
         assert_eq!(reader.seek(SeekFrom::End(-100)).unwrap(), 900);
         assert_eq!(reader.seek(SeekFrom::Start(0)).unwrap(), 0);
 
-        unsafe { sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
     }
 
     #[test]
     fn read_at_eof() {
         let mut buf = vec![0u8; rc::TOTAL_SIZE];
-        unsafe { sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
 
         let mut reader = unsafe {
             CallbackReader::new(buf.as_mut_ptr(), noop_notify, 0, CancelToken::unconnected())
@@ -179,32 +187,38 @@ mod tests {
         let mut out = [0u8; 16];
         assert_eq!(reader.read(&mut out).unwrap(), 0);
 
-        unsafe { sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
     }
 
     #[test]
     fn read_with_cancelled_token_returns_non_retryable_error() {
         let mut buf = vec![0u8; rc::TOTAL_SIZE];
-        unsafe { sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
 
         let job = Arc::new(AtomicBool::new(true));
         let token = CancelToken::new(Arc::new(AtomicBool::new(false)), job);
-        let mut reader = unsafe {
-            CallbackReader::new(buf.as_mut_ptr(), noop_notify, 1000, token)
-        };
+        let mut reader = unsafe { CallbackReader::new(buf.as_mut_ptr(), noop_notify, 1000, token) };
         let mut out = [0u8; 16];
         let err = reader.read(&mut out).unwrap_err();
         // Must NOT be Interrupted — std combinators retry that kind.
         assert_ne!(err.kind(), io::ErrorKind::Interrupted);
         assert!(err.to_string().contains("cancelled"));
 
-        unsafe { sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
     }
 
     #[test]
     fn read_with_cancelled_buffer_flag_returns_non_retryable_error() {
         let mut buf = vec![0u8; rc::TOTAL_SIZE];
-        unsafe { sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::init_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
         sb::set_flag_bits(buf.as_mut_ptr(), rc::OFFSET_FLAGS, sb::FLAG_CANCELLED);
 
         let mut reader = unsafe {
@@ -215,6 +229,8 @@ mod tests {
         assert_ne!(err.kind(), io::ErrorKind::Interrupted);
         assert!(err.to_string().contains("cancelled"));
 
-        unsafe { sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR); }
+        unsafe {
+            sb::destroy_sync(buf.as_mut_ptr(), rc::OFFSET_SYNC_PTR);
+        }
     }
 }

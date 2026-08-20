@@ -272,7 +272,10 @@ impl PdfAConverter {
     // ── pdf_manipulator patch: expose for PDF/A conversion via dispatch ──
     // (visibility change only — pub(crate) instead of private)
     // ── end pdf_manipulator patch ──
-    pub(crate) fn convert_with_editor(&self, editor: &mut DocumentEditor) -> Result<ConversionResult> {
+    pub(crate) fn convert_with_editor(
+        &self,
+        editor: &mut DocumentEditor,
+    ) -> Result<ConversionResult> {
         use std::collections::HashSet;
 
         let mut result = ConversionResult::new(self.level);

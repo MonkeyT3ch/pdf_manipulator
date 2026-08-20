@@ -11,11 +11,11 @@ pub mod binary_codec;
 pub mod bridge_api;
 pub mod constants;
 pub mod dispatch;
-pub mod lane_state;
-pub mod positioned_write;
 pub mod font_optimizer;
 #[cfg(feature = "rendering")]
 pub mod image_optimizer;
+pub mod lane_state;
+pub mod positioned_write;
 #[cfg(feature = "signatures")]
 pub mod sign;
 

@@ -3039,7 +3039,10 @@ impl DocumentBuilder {
     // Assembles the PdfWriter from pages, then writes directly to the
     // output via finish_to_writer. Each PDF object is serialized and
     // written individually — O(1) memory on the serialization side.
-    pub(crate) fn build_to_writer(self, output: &mut impl crate::host::positioned_write::PositionedWrite) -> Result<()> {
+    pub(crate) fn build_to_writer(
+        self,
+        output: &mut impl crate::host::positioned_write::PositionedWrite,
+    ) -> Result<()> {
         self.assemble_writer()?.finish_to_writer(output)
     }
     // ── end pdf_manipulator patch ──

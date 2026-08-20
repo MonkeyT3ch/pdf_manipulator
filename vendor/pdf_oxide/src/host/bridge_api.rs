@@ -36,11 +36,15 @@ use crate::writer::PageSize;
 pub(crate) struct BoxedReader(pub(crate) Box<dyn crate::document::ReadSeek>);
 
 impl std::io::Read for BoxedReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> { self.0.read(buf) }
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buf)
+    }
 }
 
 impl std::io::Seek for BoxedReader {
-    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> { self.0.seek(pos) }
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.0.seek(pos)
+    }
 }
 
 /// Concrete wrapper around a boxed Write+Seek+Send trait object.
@@ -50,12 +54,18 @@ pub(crate) trait WriteSeekTrait: std::io::Write + std::io::Seek + Send {}
 impl<T: std::io::Write + std::io::Seek + Send> WriteSeekTrait for T {}
 
 impl std::io::Write for BoxedWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> { self.0.write(buf) }
-    fn flush(&mut self) -> std::io::Result<()> { self.0.flush() }
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.write(buf)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.flush()
+    }
 }
 
 impl std::io::Seek for BoxedWriter {
-    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> { self.0.seek(pos) }
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.0.seek(pos)
+    }
 }
 
 impl crate::host::positioned_write::PositionedWrite for BoxedWriter {
@@ -74,7 +84,9 @@ fn read_all_from_reader(reader: &mut BoxedReader) -> std::io::Result<Vec<u8>> {
     let mut chunk = [0u8; 65536];
     loop {
         let n = reader.read(&mut chunk)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         buf.extend_from_slice(&chunk[..n]);
     }
     Ok(buf)
@@ -102,10 +114,18 @@ pub(crate) fn handle_request(
 
     // Helper: take a source/sink by index (removes from vec, takes ownership).
     fn take_source(sources: &mut Vec<BoxedReader>, idx: usize) -> Option<BoxedReader> {
-        if idx < sources.len() { Some(sources.remove(idx)) } else { None }
+        if idx < sources.len() {
+            Some(sources.remove(idx))
+        } else {
+            None
+        }
     }
     fn take_sink(sinks: &mut Vec<BoxedWriter>, idx: usize) -> Option<BoxedWriter> {
-        if idx < sinks.len() { Some(sinks.remove(idx)) } else { None }
+        if idx < sinks.len() {
+            Some(sinks.remove(idx))
+        } else {
+            None
+        }
     }
     // Helper: take the op's DATA source (image bytes, embedded file,
     // merge document). Pinned ops re-create the document reader at
@@ -124,14 +144,40 @@ pub(crate) fn handle_request(
     // Ops that produce output via sinks[0].
     match req.op() {
         "editorSave" => return handle_editor_save(state, &req, take_sink(&mut sinks, 0)),
-        "editorExtractPages" => return handle_editor_extract_pages(state, &req, take_sink(&mut sinks, 0)),
-        "convertTo" => return handle_convert_to(state, &req, source_bytes, take_source(&mut sources, 0), take_sink(&mut sinks, 0)),
-        "convertToPdf" => return handle_convert_to_pdf(&req, source_bytes, take_source(&mut sources, 0), take_sink(&mut sinks, 0)),
+        "editorExtractPages" => {
+            return handle_editor_extract_pages(state, &req, take_sink(&mut sinks, 0))
+        },
+        "convertTo" => {
+            return handle_convert_to(
+                state,
+                &req,
+                source_bytes,
+                take_source(&mut sources, 0),
+                take_sink(&mut sinks, 0),
+            )
+        },
+        "convertToPdf" => {
+            return handle_convert_to_pdf(
+                &req,
+                source_bytes,
+                take_source(&mut sources, 0),
+                take_sink(&mut sinks, 0),
+            )
+        },
         "builderSave" => return handle_builder_save(state, &req, take_sink(&mut sinks, 0)),
         "render" => return handle_render_streamed(state, &req, take_sink(&mut sinks, 0)),
-        "extractImages" => return handle_extract_images_streamed(state, &req, take_sink(&mut sinks, 0)),
-        "sign" => return handle_sign(&req, take_source(&mut sources, 0), source_bytes, take_sink(&mut sinks, 0)),
-        _ => {}
+        "extractImages" => {
+            return handle_extract_images_streamed(state, &req, take_sink(&mut sinks, 0))
+        },
+        "sign" => {
+            return handle_sign(
+                &req,
+                take_source(&mut sources, 0),
+                source_bytes,
+                take_sink(&mut sinks, 0),
+            )
+        },
+        _ => {},
     }
 
     match req.op() {
@@ -140,7 +186,7 @@ pub(crate) fn handle_request(
         "docDispose" => {
             state.documents.remove(&req_handle(&req));
             ok_flag("disposed")
-        }
+        },
 
         // ── Document read ops (reuse already-parsed doc via handleId) ──
         "extract" => handle_with_doc(state, &req, |doc, req| {
@@ -230,7 +276,7 @@ pub(crate) fn handle_request(
         "editorDispose" => {
             state.editors.remove(&req_handle(&req));
             ok_flag("disposed")
-        }
+        },
         "editorGetMetadata" => handle_with_editor(state, &req, |editor, _| {
             let m = dispatch::edit_get_metadata(editor);
             let mut w = ResponseWriter::ok();
@@ -270,11 +316,11 @@ pub(crate) fn handle_request(
         "editorMutate" => {
             let data = take_data_reader(&mut sources);
             handle_editor_mutate(state, &req, data)
-        }
+        },
         "editorMergeFrom" => {
             let data = take_data_reader(&mut sources);
             handle_editor_merge_from(state, &req, data)
-        }
+        },
 
         // ── Builder lifecycle ──
         "builderCreate" => handle_builder_create(state),
@@ -283,17 +329,18 @@ pub(crate) fn handle_request(
             state.builders.remove(&hid);
             state.page_ops.remove(&hid);
             ok_flag("disposed")
-        }
+        },
         "builderSetMetadata" => handle_builder_set_metadata(state, &req),
         "builderAddPage" => handle_builder_add_page(state, &req),
         "builderPageOp" => handle_builder_page_op(state, &req, take_source(&mut sources, 0)),
         "builderPageDone" => {
-            state.page_ops
+            state
+                .page_ops
                 .entry(req_handle(&req))
                 .or_default()
                 .push(dispatch::PageOp::Done);
             ok_flag("done")
-        }
+        },
 
         _ => ResponseWriter::error(&format!("unknown op: {}", req.op())),
     }
@@ -327,8 +374,7 @@ fn open_source(
         PdfDocument::from_external_reader(reader.0)
             .map_err(|e| ResponseWriter::error(&e.to_string()))
     } else if let Some(bytes) = source_bytes {
-        PdfDocument::from_bytes(bytes.to_vec())
-            .map_err(|e| ResponseWriter::error(&e.to_string()))
+        PdfDocument::from_bytes(bytes.to_vec()).map_err(|e| ResponseWriter::error(&e.to_string()))
     } else {
         Err(ResponseWriter::error(&format!("no source for {op}")))
     }
@@ -378,7 +424,10 @@ fn handle_builder_add_page(state: &mut LaneState, req: &Request<'_>) -> Vec<u8> 
         .page_ops
         .entry(req_handle(req))
         .or_default()
-        .push(dispatch::PageOp::NewPage { width: pw, height: ph });
+        .push(dispatch::PageOp::NewPage {
+            width: pw,
+            height: ph,
+        });
     ok_flag("added")
 }
 
@@ -466,7 +515,7 @@ fn handle_open(
                 item.put_i32("rotation", p.rotation);
             });
             w.finish()
-        }
+        },
         Err(e) => ResponseWriter::error(&e.to_string()),
     }
 }
@@ -497,7 +546,8 @@ fn handle_editor_open(
 }
 
 fn handle_with_doc<F>(state: &mut LaneState, req: &Request<'_>, f: F) -> Vec<u8>
-where F: FnOnce(&mut PdfDocument, &Request<'_>) -> crate::error::Result<Vec<u8>>
+where
+    F: FnOnce(&mut PdfDocument, &Request<'_>) -> crate::error::Result<Vec<u8>>,
 {
     let hid = req_handle(req);
     let docs = &mut state.documents;
@@ -511,7 +561,8 @@ where F: FnOnce(&mut PdfDocument, &Request<'_>) -> crate::error::Result<Vec<u8>>
 }
 
 fn handle_with_editor<F>(state: &mut LaneState, req: &Request<'_>, f: F) -> Vec<u8>
-where F: FnOnce(&mut DocumentEditor, &Request<'_>) -> crate::error::Result<Vec<u8>>
+where
+    F: FnOnce(&mut DocumentEditor, &Request<'_>) -> crate::error::Result<Vec<u8>>,
 {
     let hid = req_handle(req);
     let editors = &mut state.editors;
@@ -556,57 +607,58 @@ fn do_editor_mutate(
 
     match edit_op {
         "selectPages" => {
-            let pages: Vec<usize> = req.get_int_list("pages").unwrap_or(&[])
-                .iter().map(|&p| p as usize).collect();
+            let pages: Vec<usize> = req
+                .get_int_list("pages")
+                .unwrap_or(&[])
+                .iter()
+                .map(|&p| p as usize)
+                .collect();
             dispatch::edit_select_pages(editor, &pages)?;
             ok_response()
-        }
+        },
         "deletePage" => {
             let page = req.get_i32("page").unwrap_or(0) as usize;
             dispatch::edit_delete_pages(editor, &[page])?;
             ok_response()
-        }
+        },
         "rotatePage" => {
             let page = req.get_i32("page").unwrap_or(0) as usize;
             let degrees = req.get_i32("degrees").unwrap_or(0);
             dispatch::edit_rotate_pages(editor, &[(page, degrees)])?;
             ok_response()
-        }
+        },
         "rotateAll" => {
             dispatch::edit_rotate_all(editor, req.get_i32("degrees").unwrap_or(0))?;
             ok_response()
-        }
+        },
         "movePage" => {
             let from = req.get_i32("from").unwrap_or(0) as usize;
             let to = req.get_i32("to").unwrap_or(0) as usize;
             dispatch::edit_move_page(editor, from, to)?;
             ok_response()
-        }
+        },
         "flattenForms" => {
             dispatch::edit_flatten_forms(editor)?;
             ok_response()
-        }
+        },
         "flattenAllAnnotations" => {
             dispatch::edit_flatten_all_annotations(editor)?;
             ok_response()
-        }
+        },
         "applyRedactionsDestructive" => {
             dispatch::edit_apply_redactions_destructive(editor)?;
             ok_response()
-        }
+        },
         "compress" => {
             dispatch::edit_compress(editor, req.get_i32("quality").unwrap_or(75) as u8)?;
             ok_response()
-        }
+        },
         "optimizeImages" => {
             let legacy_min_size = req.get_i32("minSize").map(|value| value.max(0) as u32);
             let options = crate::host::image_optimizer::ImageOptimizationOptions {
                 jpeg_quality: req.get_i32("quality").unwrap_or(75).clamp(1, 100) as u8,
                 target_dpi: req.get_f64("targetDpi").unwrap_or(0.0).max(0.0),
-                downsample_threshold: req
-                    .get_f64("downsampleThreshold")
-                    .unwrap_or(1.5)
-                    .max(1.0),
+                downsample_threshold: req.get_f64("downsampleThreshold").unwrap_or(1.5).max(1.0),
                 chroma_subsampling: match req.get_str("chromaSubsampling") {
                     Some("444") => crate::host::image_optimizer::ChromaSubsampling::Yuv444,
                     Some("420") => crate::host::image_optimizer::ChromaSubsampling::Yuv420,
@@ -623,38 +675,39 @@ fn do_editor_mutate(
                 pass_through_jpeg: req.get_bool("passThroughJpeg").unwrap_or(true),
                 legacy_min_dimension: legacy_min_size.unwrap_or(0),
             };
-            let count = dispatch::edit_optimize_images(
-                editor,
-                options,
-            )?;
+            let count = dispatch::edit_optimize_images(editor, options)?;
             let mut w = ResponseWriter::ok();
             w.put_i32("count", count as i32);
             Ok(w.finish())
-        }
+        },
         "embedFile" => {
             let name = req.get_str("name").unwrap_or("file");
             let data = if let Some(ref mut reader) = data_reader {
-                read_all_from_reader(reader)
-                    .map_err(|e| Error::InvalidPdf(e.to_string()))?
+                read_all_from_reader(reader).map_err(|e| Error::InvalidPdf(e.to_string()))?
             } else {
                 req.get_bytes("data").unwrap_or(&[]).to_vec()
             };
             dispatch::edit_embed_file(editor, name, data)?;
             ok_response()
-        }
+        },
         "eraseRegions" => {
             let page = req.get_i32("page").unwrap_or(0) as usize;
             let coords = req.get_f64_list("regions").unwrap_or(&[]);
-            let rects: Vec<[f32; 4]> = coords.chunks(4)
+            let rects: Vec<[f32; 4]> = coords
+                .chunks(4)
                 .filter(|c| c.len() == 4)
                 .map(|c| [c[0] as f32, c[1] as f32, c[2] as f32, c[3] as f32])
                 .collect();
             dispatch::edit_erase_regions(editor, page, &rects)?;
             ok_response()
-        }
+        },
         "watermark" => {
-            let pos_fields: Vec<f32> = req.get_f64_list("posFields")
-                .unwrap_or(&[]).iter().map(|&f| f as f32).collect();
+            let pos_fields: Vec<f32> = req
+                .get_f64_list("posFields")
+                .unwrap_or(&[])
+                .iter()
+                .map(|&f| f as f32)
+                .collect();
             dispatch::edit_watermark(
                 editor,
                 req.get_i32("page").unwrap_or(-1),
@@ -670,7 +723,7 @@ fn do_editor_mutate(
                 &pos_fields,
             )?;
             ok_response()
-        }
+        },
         "addStamp" => {
             dispatch::edit_add_stamp(
                 editor,
@@ -683,11 +736,10 @@ fn do_editor_mutate(
                 req.get_f64("opacity").unwrap_or(1.0) as f32,
             )?;
             ok_response()
-        }
+        },
         "addImageStamp" => {
             let image_bytes = if let Some(ref mut reader) = data_reader {
-                read_all_from_reader(reader)
-                    .map_err(|e| Error::InvalidPdf(e.to_string()))?
+                read_all_from_reader(reader).map_err(|e| Error::InvalidPdf(e.to_string()))?
             } else {
                 req.get_bytes("imageData").unwrap_or(&[]).to_vec()
             };
@@ -702,37 +754,37 @@ fn do_editor_mutate(
                 req.get_f64("opacity").unwrap_or(1.0) as f32,
             )?;
             ok_response()
-        }
+        },
         "setTitle" => {
             dispatch::edit_set_title(editor, req.get_str("title").unwrap_or(""));
             ok_response()
-        }
+        },
         "setAuthor" => {
             dispatch::edit_set_author(editor, req.get_str("author").unwrap_or(""));
             ok_response()
-        }
+        },
         "setSubject" => {
             dispatch::edit_set_subject(editor, req.get_str("subject").unwrap_or(""));
             ok_response()
-        }
+        },
         "setKeywords" => {
             dispatch::edit_set_keywords(editor, req.get_str("keywords").unwrap_or(""));
             ok_response()
-        }
+        },
         "setProducer" => {
             dispatch::edit_set_producer(editor, req.get_str("producer").unwrap_or(""));
             ok_response()
-        }
+        },
         "setCreationDate" => {
             dispatch::edit_set_creation_date(editor, req.get_str("creationDate").unwrap_or(""));
             ok_response()
-        }
+        },
         "unembedStandardFonts" => {
             let count = dispatch::edit_unembed_standard_fonts(editor)?;
             let mut w = ResponseWriter::ok();
             w.put_i32("count", count as i32);
             Ok(w.finish())
-        }
+        },
         "setFormFieldValue" => {
             dispatch::edit_set_form_field_value(
                 editor,
@@ -740,7 +792,7 @@ fn do_editor_mutate(
                 req.get_str("value").unwrap_or(""),
             )?;
             ok_response()
-        }
+        },
         "cropMargins" => {
             dispatch::edit_crop_margins(
                 editor,
@@ -750,11 +802,11 @@ fn do_editor_mutate(
                 req.get_f64("bottom").unwrap_or(0.0) as f32,
             )?;
             ok_response()
-        }
+        },
         "convertToPdfA" => {
             dispatch::edit_convert_to_pdf_a(editor, req.get_i32("level").unwrap_or(2))?;
             ok_response()
-        }
+        },
         "resizeImage" => {
             dispatch::edit_resize_image(
                 editor,
@@ -764,7 +816,7 @@ fn do_editor_mutate(
                 req.get_f64("height").unwrap_or(100.0) as f32,
             )?;
             ok_response()
-        }
+        },
         "addRedaction" => {
             dispatch::edit_add_redaction(
                 editor,
@@ -777,11 +829,11 @@ fn do_editor_mutate(
                 ],
             )?;
             ok_response()
-        }
+        },
         "scrubMetadata" => {
             dispatch::edit_scrub_metadata(editor)?;
             ok_response()
-        }
+        },
         _ => Err(Error::InvalidPdf(format!("unknown editOp: {edit_op}"))),
     }
 }
@@ -829,7 +881,7 @@ fn handle_builder_page_op(
                 h: req.get_f64("height").unwrap_or(0.0) as f32,
                 alt: req.get_str("altText").unwrap_or("").to_string(),
             }
-        }
+        },
         "textField" => dispatch::PageOp::TextField {
             name: req.get_str("name").unwrap_or("").to_string(),
             x: req.get_f64("x").unwrap_or(0.0) as f32,
@@ -852,7 +904,12 @@ fn handle_builder_page_op(
             y: req.get_f64("y").unwrap_or(0.0) as f32,
             w: req.get_f64("width").unwrap_or(0.0) as f32,
             h: req.get_f64("height").unwrap_or(0.0) as f32,
-            options: req.get_string_list("options").unwrap_or_default().into_iter().map(|s| s.to_string()).collect(),
+            options: req
+                .get_string_list("options")
+                .unwrap_or_default()
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             selected: req.get_str("selected").map(|s| s.to_string()),
         },
         "pushButton" => dispatch::PageOp::PushButton {
@@ -870,10 +927,18 @@ fn handle_builder_page_op(
             w: req.get_f64("width").unwrap_or(0.0) as f32,
             h: req.get_f64("height").unwrap_or(0.0) as f32,
         },
-        "fieldKeystroke" => dispatch::PageOp::FieldKeystroke(req.get_str("script").unwrap_or("").to_string()),
-        "fieldFormat" => dispatch::PageOp::FieldFormat(req.get_str("script").unwrap_or("").to_string()),
-        "fieldValidate" => dispatch::PageOp::FieldValidate(req.get_str("script").unwrap_or("").to_string()),
-        "fieldCalculate" => dispatch::PageOp::FieldCalculate(req.get_str("script").unwrap_or("").to_string()),
+        "fieldKeystroke" => {
+            dispatch::PageOp::FieldKeystroke(req.get_str("script").unwrap_or("").to_string())
+        },
+        "fieldFormat" => {
+            dispatch::PageOp::FieldFormat(req.get_str("script").unwrap_or("").to_string())
+        },
+        "fieldValidate" => {
+            dispatch::PageOp::FieldValidate(req.get_str("script").unwrap_or("").to_string())
+        },
+        "fieldCalculate" => {
+            dispatch::PageOp::FieldCalculate(req.get_str("script").unwrap_or("").to_string())
+        },
         "linkUrl" => dispatch::PageOp::LinkUrl(req.get_str("url").unwrap_or("").to_string()),
         "linkPage" => dispatch::PageOp::LinkPage(req.get_i32("targetPage").unwrap_or(0) as usize),
         "footnote" => dispatch::PageOp::Footnote {
@@ -889,13 +954,10 @@ fn handle_builder_page_op(
         "newPageSameSize" => dispatch::PageOp::NewPageSameSize,
         _ => {
             return ResponseWriter::error(&format!("unknown pageOp: {page_op}"));
-        }
+        },
     };
 
-    state.page_ops
-        .entry(hid)
-        .or_default()
-        .push(op);
+    state.page_ops.entry(hid).or_default().push(op);
 
     ok_flag("buffered")
 }
@@ -939,9 +1001,7 @@ fn convert_to_with_doc(
 ) -> Vec<u8> {
     if let Some(mut writer) = sink_writer {
         match dispatch::convert_to_format_writer(doc, format, &mut writer) {
-            Ok(()) => {
-                ok_flag("streamed")
-            }
+            Ok(()) => ok_flag("streamed"),
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     } else {
@@ -950,7 +1010,7 @@ fn convert_to_with_doc(
                 let mut w = ResponseWriter::ok();
                 w.put_bytes("data", &bytes);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     }
@@ -968,16 +1028,16 @@ fn handle_convert_to_pdf(
         // Streaming path: reader → converter → writer. O(1) memory.
         if let Some(reader) = source_reader {
             match dispatch::convert_from_format_writer(reader, format, &mut writer) {
-                Ok(()) => {
-                    ok_flag("streamed")
-                }
+                Ok(()) => ok_flag("streamed"),
                 Err(e) => ResponseWriter::error(&e.to_string()),
             }
         } else if let Some(bytes) = source_bytes {
-            match dispatch::convert_from_format_writer(std::io::Cursor::new(bytes.to_vec()), format, &mut writer) {
-                Ok(()) => {
-                    ok_flag("streamed")
-                }
+            match dispatch::convert_from_format_writer(
+                std::io::Cursor::new(bytes.to_vec()),
+                format,
+                &mut writer,
+            ) {
+                Ok(()) => ok_flag("streamed"),
                 Err(e) => ResponseWriter::error(&e.to_string()),
             }
         } else {
@@ -1000,13 +1060,17 @@ fn handle_convert_to_pdf(
                 let mut w = ResponseWriter::ok();
                 w.put_bytes("data", &bytes);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     }
 }
 
-fn handle_builder_save(state: &mut LaneState, req: &Request<'_>, sink_writer: Option<BoxedWriter>) -> Vec<u8> {
+fn handle_builder_save(
+    state: &mut LaneState,
+    req: &Request<'_>,
+    sink_writer: Option<BoxedWriter>,
+) -> Vec<u8> {
     let hid = req_handle(req);
     let builders_map = &mut state.builders;
     let builder = match builders_map.remove(&hid) {
@@ -1022,9 +1086,7 @@ fn handle_builder_save(state: &mut LaneState, req: &Request<'_>, sink_writer: Op
 
     if let Some(mut writer) = sink_writer {
         match dispatch::builder_save_to_writer(builder, &mut writer) {
-            Ok(()) => {
-                ok_flag("streamed")
-            }
+            Ok(()) => ok_flag("streamed"),
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     } else {
@@ -1033,13 +1095,17 @@ fn handle_builder_save(state: &mut LaneState, req: &Request<'_>, sink_writer: Op
                 let mut w = ResponseWriter::ok();
                 w.put_bytes("data", &bytes);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     }
 }
 
-fn handle_render_streamed(state: &mut LaneState, req: &Request<'_>, sink_writer: Option<BoxedWriter>) -> Vec<u8> {
+fn handle_render_streamed(
+    state: &mut LaneState,
+    req: &Request<'_>,
+    sink_writer: Option<BoxedWriter>,
+) -> Vec<u8> {
     let hid = req_handle(req);
     let docs = &mut state.documents;
     let doc = match docs.get_mut(&hid) {
@@ -1064,7 +1130,7 @@ fn handle_render_streamed(state: &mut LaneState, req: &Request<'_>, sink_writer:
                 w.put_bool("streamed", true);
                 w.put_i32("itemCount", count as i32);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     } else {
@@ -1076,13 +1142,17 @@ fn handle_render_streamed(state: &mut LaneState, req: &Request<'_>, sink_writer:
                 w.put_i32("height", result.height as i32);
                 w.put_bytes("data", &result.data);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     }
 }
 
-fn handle_extract_images_streamed(state: &mut LaneState, req: &Request<'_>, sink_writer: Option<BoxedWriter>) -> Vec<u8> {
+fn handle_extract_images_streamed(
+    state: &mut LaneState,
+    req: &Request<'_>,
+    sink_writer: Option<BoxedWriter>,
+) -> Vec<u8> {
     let hid = req_handle(req);
     let docs = &mut state.documents;
     let doc = match docs.get_mut(&hid) {
@@ -1099,7 +1169,7 @@ fn handle_extract_images_streamed(state: &mut LaneState, req: &Request<'_>, sink
                 w.put_bool("streamed", true);
                 w.put_i32("itemCount", count as i32);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     } else {
@@ -1116,7 +1186,7 @@ fn handle_extract_images_streamed(state: &mut LaneState, req: &Request<'_>, sink
                     item.put_bytes("data", &img.data);
                 });
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     }
@@ -1131,12 +1201,17 @@ fn handle_sign(
 ) -> Vec<u8> {
     use crate::signatures::{SignOptions, SigningCredentials};
 
-    let credentials = if let (Some(cert), Some(pw)) = (req.get_bytes("certificate"), req.get_str("certificatePassword")) {
+    let credentials = if let (Some(cert), Some(pw)) =
+        (req.get_bytes("certificate"), req.get_str("certificatePassword"))
+    {
         SigningCredentials::from_pkcs12(cert, pw)
-    } else if let (Some(cert_pem), Some(key_pem)) = (req.get_str("certPem"), req.get_str("keyPem")) {
+    } else if let (Some(cert_pem), Some(key_pem)) = (req.get_str("certPem"), req.get_str("keyPem"))
+    {
         SigningCredentials::from_pem(cert_pem, key_pem)
     } else {
-        return ResponseWriter::error("sign: missing credentials (certificate+password or certPem+keyPem)");
+        return ResponseWriter::error(
+            "sign: missing credentials (certificate+password or certPem+keyPem)",
+        );
     };
 
     let credentials = match credentials {
@@ -1152,12 +1227,8 @@ fn handle_sign(
 
     if let (Some(mut reader), Some(mut writer)) = (source_reader, sink_writer) {
         let length = req.get_i64("sourceLength").unwrap_or(0) as u64;
-        match crate::host::sign::sign_pdf(
-            &mut reader, length, &mut writer, &credentials, opts,
-        ) {
-            Ok(()) => {
-                ok_flag("signed")
-            }
+        match crate::host::sign::sign_pdf(&mut reader, length, &mut writer, &credentials, opts) {
+            Ok(()) => ok_flag("signed"),
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     } else if let Some(bytes) = source_bytes {
@@ -1166,7 +1237,7 @@ fn handle_sign(
                 let mut w = ResponseWriter::ok();
                 w.put_bytes("data", &signed);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     } else {
@@ -1219,7 +1290,7 @@ fn handle_editor_save(
                 algorithm: algo,
                 permissions: permissions_from_bits(perm_bits),
             })
-        }
+        },
         _ => None,
     };
     let options = crate::editor::SaveOptions {
@@ -1232,9 +1303,7 @@ fn handle_editor_save(
 
     if let Some(mut writer) = sink_writer {
         match dispatch::edit_save_with_options(editor, &mut writer, &options) {
-            Ok(()) => {
-                ok_flag("streamed")
-            }
+            Ok(()) => ok_flag("streamed"),
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     } else {
@@ -1243,7 +1312,7 @@ fn handle_editor_save(
                 let mut w = ResponseWriter::ok();
                 w.put_bytes("data", &bytes);
                 w.finish()
-            }
+            },
             Err(e) => ResponseWriter::error(&e.to_string()),
         }
     }
@@ -1272,7 +1341,8 @@ fn handle_editor_extract_pages(
     for &p in pages {
         if (p as usize) >= page_count {
             return ResponseWriter::error(&format!(
-                "page index {} out of range (document has {} pages)", p, page_count
+                "page index {} out of range (document has {} pages)",
+                p, page_count
             ));
         }
     }
@@ -1290,12 +1360,12 @@ fn handle_editor_extract_pages(
 
     let result = if let Some(mut writer) = sink_writer {
         dispatch::edit_save_with_options(
-            editor, &mut writer, &crate::editor::SaveOptions::full_rewrite(),
+            editor,
+            &mut writer,
+            &crate::editor::SaveOptions::full_rewrite(),
         )
     } else {
-        Err(crate::error::Error::InvalidPdf(
-            "editorExtractPages requires a sink".into(),
-        ))
+        Err(crate::error::Error::InvalidPdf("editorExtractPages requires a sink".into()))
     };
 
     // Always restore — even on error.
@@ -1303,15 +1373,17 @@ fn handle_editor_extract_pages(
     editor.set_modified(saved_modified);
     if let Some((pages_id, prior)) = staged {
         match prior {
-            Some(prev) => { editor.modified_objects_mut().insert(pages_id, prev); }
-            None => { editor.modified_objects_mut().remove(&pages_id); }
+            Some(prev) => {
+                editor.modified_objects_mut().insert(pages_id, prev);
+            },
+            None => {
+                editor.modified_objects_mut().remove(&pages_id);
+            },
         }
     }
 
     match result {
-        Ok(()) => {
-            ok_flag("streamed")
-        }
+        Ok(()) => ok_flag("streamed"),
         Err(e) => ResponseWriter::error(&e.to_string()),
     }
 }
@@ -1390,10 +1462,14 @@ mod wasm_entry {
         for i in 0..num_sources {
             let offset = i * 8;
             let len = f64::from_le_bytes([
-                source_lengths[offset], source_lengths[offset+1],
-                source_lengths[offset+2], source_lengths[offset+3],
-                source_lengths[offset+4], source_lengths[offset+5],
-                source_lengths[offset+6], source_lengths[offset+7],
+                source_lengths[offset],
+                source_lengths[offset + 1],
+                source_lengths[offset + 2],
+                source_lengths[offset + 3],
+                source_lengths[offset + 4],
+                source_lengths[offset + 5],
+                source_lengths[offset + 6],
+                source_lengths[offset + 7],
             ]);
             if len > 0.0 {
                 sources.push(BoxedReader(Box::new(JsCallbackReader::new(i as u32, len as u64))));
@@ -1412,7 +1488,9 @@ mod wasm_entry {
     /// Graceful-path only — `worker.terminate()` makes this moot.
     #[wasm_bindgen]
     pub fn lane_destroy(lane_ptr: u32) {
-        if lane_ptr == 0 { return; }
+        if lane_ptr == 0 {
+            return;
+        }
         unsafe {
             let _ = Box::from_raw(lane_ptr as *mut LaneState);
         }

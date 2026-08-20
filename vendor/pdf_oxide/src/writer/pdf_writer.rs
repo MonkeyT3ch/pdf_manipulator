@@ -1251,7 +1251,10 @@ impl PdfWriter {
     // Each object is serialized and written individually — O(1) memory.
     // Uses PositionedWrite (position tracking without Seek) so any
     // Write-only sink works via CountingWriter.
-    pub(crate) fn finish_to_writer(mut self, output: &mut impl crate::host::positioned_write::PositionedWrite) -> Result<()> {
+    pub(crate) fn finish_to_writer(
+        mut self,
+        output: &mut impl crate::host::positioned_write::PositionedWrite,
+    ) -> Result<()> {
         let serializer = ObjectSerializer::compact();
         let mut xref_offsets: Vec<(u32, usize)> = Vec::new();
 
@@ -2026,11 +2029,7 @@ impl PdfWriter {
         if let Some(acroform_id) = acroform_id {
             if let Some(acroform_obj) = self.objects.get(&acroform_id) {
                 xref_offsets.push((acroform_id, output.position() as usize));
-                output.write_all(&serializer.serialize_indirect(
-                    acroform_id,
-                    0,
-                    acroform_obj,
-                ))?;
+                output.write_all(&serializer.serialize_indirect(acroform_id, 0, acroform_obj))?;
             }
         }
 
