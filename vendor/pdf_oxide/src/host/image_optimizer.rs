@@ -596,13 +596,19 @@ fn resolved_color_space_name(
     source: &PdfDocument,
     dict: &HashMap<String, Object>,
 ) -> Option<String> {
-    let color_space = dict.get("ColorSpace")?;
-    match color_space {
-        Object::Name(name) => Some(name.clone()),
-        Object::Reference(reference) => source
-            .load_object(*reference)
-            .ok()
-            .and_then(|object| object.as_name().map(ToOwned::to_owned)),
+    let color_space = source.resolve_object(dict.get("ColorSpace")?).ok()?;
+    if let Some(name) = color_space.as_name() {
+        return Some(name.to_owned());
+    }
+
+    let values = color_space.as_array()?;
+    if values.first().and_then(Object::as_name) != Some("ICCBased") {
+        return None;
+    }
+    let profile = source.resolve_object(values.get(1)?).ok()?;
+    match profile.as_dict()?.get("N").and_then(Object::as_integer) {
+        Some(1) => Some("DeviceGray".to_owned()),
+        Some(3) => Some("DeviceRGB".to_owned()),
         _ => None,
     }
 }
