@@ -3368,8 +3368,13 @@ impl DocumentEditor {
                                                 let xobject_dict = match xobjects {
                                                     Object::Dictionary(d) => Some(d.clone()),
                                                     Object::Reference(r) => {
-                                                        let loaded =
-                                                            self.source.load_object(*r).map_err(|e| {
+                                                        let loaded = self
+                                                            .modified_objects
+                                                            .get(&r.id)
+                                                            .cloned()
+                                                            .map(Ok)
+                                                            .unwrap_or_else(|| self.source.load_object(*r))
+                                                            .map_err(|e| {
                                                                 log::warn!("Failed to load resource object {} during save: {}", r.id, e);
                                                                 e
                                                             }).ok();
@@ -3400,8 +3405,15 @@ impl DocumentEditor {
                                                             xobj_ref.as_reference()
                                                         {
                                                             if !written_ids.contains(&ref_obj.id) {
-                                                                if let Ok(xobj_obj) =
-                                                                    self.source.load_object(ref_obj)
+                                                                let xobj_obj = self
+                                                                    .modified_objects
+                                                                    .get(&ref_obj.id)
+                                                                    .cloned()
+                                                                    .map(Ok)
+                                                                    .unwrap_or_else(|| {
+                                                                        self.source.load_object(ref_obj)
+                                                                    });
+                                                                if let Ok(xobj_obj) = xobj_obj
                                                                 {
                                                                     let offset =
                                                                         writer.position();
